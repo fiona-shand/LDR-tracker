@@ -37,6 +37,12 @@ export default async function AppLayout({
           <Link href="/" className="font-semibold">
             LDR Tracker
           </Link>
+          <Link href="/settings/airports" className="text-sm text-gray-500 hover:text-foreground">
+            Airports
+          </Link>
+          <Link href="/settings/destinations" className="text-sm text-gray-500 hover:text-foreground">
+            Destinations
+          </Link>
         </nav>
         <div className="flex items-center gap-4">
           <ProfileSwitcher people={people} activeProfileId={activeProfileId} />
