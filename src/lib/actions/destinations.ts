@@ -21,19 +21,30 @@ export async function addDestination(formData: FormData) {
 
   if (!parsed.success) return;
 
-  await prisma.destination.upsert({
-    where: { iataCode: parsed.data.iataCode },
-    update: { cityName: parsed.data.cityName },
-    create: parsed.data,
-  });
+  try {
+    await prisma.destination.upsert({
+      where: { iataCode: parsed.data.iataCode },
+      update: { cityName: parsed.data.cityName },
+      create: parsed.data,
+    });
+  } catch {
+    return;
+  }
 
-  revalidatePath("/settings/destinations");
+  revalidatePath("/destinations");
+  revalidatePath("/search");
 }
 
 export async function removeDestination(formData: FormData) {
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return;
 
-  await prisma.destination.delete({ where: { id } });
-  revalidatePath("/settings/destinations");
+  try {
+    await prisma.destination.delete({ where: { id } });
+  } catch {
+    return;
+  }
+
+  revalidatePath("/destinations");
+  revalidatePath("/search");
 }

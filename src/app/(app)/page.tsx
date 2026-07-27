@@ -1,67 +1,40 @@
-import RouteHero from "@/components/route-hero";
-import WindowCard, { type SampleWindow } from "@/components/window-card";
-import FlightTeaser, { type SampleFares } from "@/components/flight-teaser";
+import { addMonths } from "date-fns";
+import MonthCalendar from "@/components/month-calendar";
+import WeekendCard from "@/components/weekend-card";
+import { getUpcomingWeekends } from "@/lib/mock-availability";
+import { PEOPLE } from "@/lib/people";
 
-const SAMPLE_WINDOWS: SampleWindow[] = [
-  {
-    id: "1",
-    label: "Long weekend",
-    dateRange: "Fri, Sep 12 – Mon, Sep 15",
-    nights: 3,
-    weekendOnly: true,
-  },
-  {
-    id: "2",
-    label: "Extended trip",
-    dateRange: "Thu, Oct 23 – Wed, Oct 29",
-    nights: 6,
-    weekendOnly: false,
-    ptoDays: 3,
-  },
-  {
-    id: "3",
-    label: "Quick reunion",
-    dateRange: "Fri, Nov 21 – Sun, Nov 23",
-    nights: 2,
-    weekendOnly: true,
-  },
-];
+export const dynamic = "force-dynamic";
 
-const SAMPLE_FARES: SampleFares = {
-  destinationCity: "Lisbon",
-  destinationCode: "LIS",
-  fareFromYou: 214,
-  fareFromPartner: 389,
-};
+export default function CalendarPage() {
+  const today = new Date();
+  const months = [0, 1, 2].map((offset) => addMonths(today, offset));
+  const weekends = getUpcomingWeekends(8);
 
-export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-10">
-      <RouteHero />
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
+        <p className="mt-1 text-sm text-muted">
+          {PEOPLE.map((p) => `${p.name} (${p.airport.iataCode})`).join(" & ")} —
+          weekends highlighted below are free for both of you.
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {months.map((month) => (
+          <MonthCalendar key={month.toISOString()} month={month} />
+        ))}
+      </div>
 
       <section>
-        <div className="mb-4 flex items-baseline justify-between">
-          <h1 className="text-xl font-semibold tracking-tight">
-            Availability windows
-          </h1>
-          <span className="text-sm text-muted">Next 6 months</span>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {SAMPLE_WINDOWS.map((window) => (
-            <WindowCard key={window.id} window={window} />
+        <h2 className="mb-4 text-xl font-semibold tracking-tight">
+          Upcoming weekends
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {weekends.map((weekend) => (
+            <WeekendCard key={weekend.saturday.toISOString()} weekend={weekend} />
           ))}
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-4 flex items-baseline justify-between">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Flight preview
-          </h2>
-          <span className="text-sm text-muted">for your next window</span>
-        </div>
-        <div className="max-w-sm">
-          <FlightTeaser fares={SAMPLE_FARES} />
         </div>
       </section>
     </div>

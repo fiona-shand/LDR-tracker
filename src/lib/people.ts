@@ -1,12 +1,15 @@
 export const PEOPLE = [
   {
-    id: "you",
-    name: "You",
-    airport: { iataCode: "LHR", city: "London Heathrow" },
-  },
-  {
-    id: "partner",
-    name: "Partner",
+    id: "fiona",
+    name: "Fiona",
     airport: { iataCode: "MSP", city: "Minneapolis–St Paul" },
   },
+  {
+    id: "jake",
+    name: "Jake",
+    airport: { iataCode: "LHR", city: "London Heathrow" },
+  },
 ] as const;
+
+export const FIONA = PEOPLE[0];
+export const JAKE = PEOPLE[1];

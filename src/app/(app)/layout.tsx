@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
+import NavLinks from "@/components/nav-links";
 
 export default function AppLayout({
   children,
@@ -16,14 +17,7 @@ export default function AppLayout({
             </span>
             LDR Tracker
           </Link>
-          <nav className="flex items-center gap-6 text-sm text-muted">
-            <Link href="/" className="hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/settings/destinations" className="hover:text-foreground transition-colors">
-              Destinations
-            </Link>
-          </nav>
+          <NavLinks />
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
