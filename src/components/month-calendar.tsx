@@ -1,10 +1,16 @@
 import { addDays, eachDayOfInterval, endOfMonth, format, isToday, startOfDay, startOfMonth } from "date-fns";
 import Link from "next/link";
-import { getDayStatus } from "@/lib/mock-availability";
+import { getDayStatus, type AvailabilitySnapshot } from "@/lib/availability";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-export default function MonthCalendar({ month }: { month: Date }) {
+export default function MonthCalendar({
+  month,
+  snapshot,
+}: {
+  month: Date;
+  snapshot: AvailabilitySnapshot;
+}) {
   const start = startOfMonth(month);
   const end = endOfMonth(month);
   const leadingBlanks = start.getDay();
@@ -29,7 +35,7 @@ export default function MonthCalendar({ month }: { month: Date }) {
           const isPast = day < today;
           const dow = day.getDay();
           const isWeekendDay = dow === 0 || dow === 6;
-          const status = getDayStatus(day);
+          const status = getDayStatus(snapshot, day);
           const bothFreeWeekend = !isPast && isWeekendDay && status === "both-free";
           const isTodayCell = isToday(day);
 

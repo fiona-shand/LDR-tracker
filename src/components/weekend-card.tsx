@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { CalendarCheck2, X } from "lucide-react";
-import type { WeekendAvailability } from "@/lib/mock-availability";
+import type { WeekendAvailability } from "@/lib/availability";
 
 export default function WeekendCard({ weekend }: { weekend: WeekendAvailability }) {
   const saturdayIso = format(weekend.saturday, "yyyy-MM-dd");

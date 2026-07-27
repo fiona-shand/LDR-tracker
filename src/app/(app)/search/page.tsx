@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import DestinationFareCard, { type TripOption } from "@/components/destination-fare-card";
-import { getUpcomingWeekends, getWeekendBySaturdayIso } from "@/lib/mock-availability";
+import { getAvailabilitySnapshot, getUpcomingWeekends, getWeekendBySaturdayIso } from "@/lib/availability";
 import { getDestinationsOrSample } from "@/lib/destinations-data";
 import { mockFare } from "@/lib/mock-fares";
 import { FIONA, JAKE } from "@/lib/people";
@@ -15,9 +15,10 @@ export default async function SearchPage({
 }) {
   const { weekend: weekendParam } = await searchParams;
 
-  const upcomingFreeWeekends = getUpcomingWeekends(10).filter((w) => w.bothFree);
+  const snapshot = await getAvailabilitySnapshot();
+  const upcomingFreeWeekends = getUpcomingWeekends(snapshot, 10).filter((w) => w.bothFree);
   const weekend =
-    (weekendParam ? getWeekendBySaturdayIso(weekendParam) : null) ??
+    (weekendParam ? getWeekendBySaturdayIso(snapshot, weekendParam) : null) ??
     upcomingFreeWeekends[0] ??
     null;
 

@@ -1,23 +1,27 @@
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PEOPLE } from "../src/lib/people";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+const TIMEZONES: Record<string, string> = {
+  fiona: "America/Chicago",
+  jake: "Europe/London",
+};
+
 async function main() {
-  const fiona = await prisma.person.upsert({
-    where: { id: "fiona" },
-    update: {},
-    create: { id: "fiona", name: "Fiona", timezone: "America/Los_Angeles" },
-  });
+  for (const person of PEOPLE) {
+    await prisma.person.upsert({
+      where: { id: person.id },
+      update: { name: person.name, timezone: TIMEZONES[person.id] },
+      create: {
+        id: person.id,
+        name: person.name,
+        timezone: TIMEZONES[person.id] ?? "UTC",
+      },
+    });
 
-  const partner = await prisma.person.upsert({
-    where: { id: "partner" },
-    update: {},
-    create: { id: "partner", name: "Partner", timezone: "Europe/London" },
-  });
-
-  for (const person of [fiona, partner]) {
     await prisma.ptoBalance.upsert({
       where: { personId: person.id },
       update: {},
@@ -25,7 +29,7 @@ async function main() {
     });
   }
 
-  console.log("Seeded people:", fiona.name, partner.name);
+  console.log("Seeded people:", PEOPLE.map((p) => p.name).join(", "));
 }
 
 main()

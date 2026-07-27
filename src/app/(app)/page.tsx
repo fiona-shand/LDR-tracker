@@ -1,15 +1,17 @@
 import { addMonths } from "date-fns";
 import MonthCalendar from "@/components/month-calendar";
 import WeekendCard from "@/components/weekend-card";
-import { getUpcomingWeekends } from "@/lib/mock-availability";
+import CalendarConnect from "@/components/calendar-connect";
+import { getAvailabilitySnapshot, getUpcomingWeekends } from "@/lib/availability";
 import { PEOPLE } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
-export default function CalendarPage() {
+export default async function CalendarPage() {
+  const snapshot = await getAvailabilitySnapshot();
   const today = new Date();
   const months = [0, 1, 2].map((offset) => addMonths(today, offset));
-  const weekends = getUpcomingWeekends(8);
+  const weekends = getUpcomingWeekends(snapshot, 8);
 
   return (
     <div className="flex flex-col gap-10">
@@ -21,9 +23,16 @@ export default function CalendarPage() {
         </p>
       </div>
 
+      <section>
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
+          Connect calendars
+        </h2>
+        <CalendarConnect snapshot={snapshot} />
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-3">
         {months.map((month) => (
-          <MonthCalendar key={month.toISOString()} month={month} />
+          <MonthCalendar key={month.toISOString()} month={month} snapshot={snapshot} />
         ))}
       </div>
 
