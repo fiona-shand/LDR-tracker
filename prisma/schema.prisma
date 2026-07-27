@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Person {
+  id       String @id @default(cuid())
+  name     String
+  timezone String @default("UTC")
+
+  createdAt DateTime @default(now())
+
+  airports            Airport[]
+  calendarConnections CalendarConnection[]
+  busyBlocks          BusyBlock[]
+  ptoBalance          PtoBalance?
+  ptoAdjustments      PtoAdjustment[]
+}
+
+model Airport {
+  id        String  @id @default(cuid())
+  personId  String
+  person    Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  iataCode  String
+  label     String?
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([personId, iataCode])
+  @@index([personId])
+}
+
+model Destination {
+  id       String @id @default(cuid())
+  iataCode String @unique
+  cityName String
+
+  createdAt DateTime @default(now())
+}
+
+enum CalendarProvider {
+  GOOGLE
+  ICS
+}
+
+model CalendarConnection {
+  id       String           @id @default(cuid())
+  personId String
+  person   Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  provider CalendarProvider
+  label    String?
+
+  // Google-specific
+  googleRefreshTokenEnc String? @db.Text
+  googleCalendarId      String?
+
+  // ICS-specific
+  icsUrl String? @db.Text
+
+  lastSyncedAt   DateTime?
+  lastSyncStatus String?
+
+  createdAt DateTime @default(now())
+
+  busyBlocks BusyBlock[]
+
+  @@index([personId])
+}
+
+model BusyBlock {
+  id                   String             @id @default(cuid())
+  personId             String
+  person               Person             @relation(fields: [personId], references: [id], onDelete: Cascade)
+  calendarConnectionId String
+  calendarConnection   CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
+
+  externalEventId String
+  title           String?
+  startsAt        DateTime
+  endsAt          DateTime
+  isAllDay        Boolean  @default(false)
+
+  syncedAt DateTime @default(now())
+
+  @@unique([calendarConnectionId, externalEventId])
+  @@index([personId, startsAt, endsAt])
+}
+
+model AvailabilityWindow {
+  id           String   @id @default(cuid())
+  startsAt     DateTime
+  endsAt       DateTime
+  weekdayCount Int
+  weekendOnly  Boolean
+
+  computedAt DateTime @default(now())
+
+  flightSearches FlightSearch[]
+
+  @@index([startsAt, endsAt])
+}
+
+model PtoBalance {
+  id          String   @id @default(cuid())
+  personId    String   @unique
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  currentDays Decimal  @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model PtoAdjustment {
+  id        String   @id @default(cuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  deltaDays Decimal
+  reason    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([personId])
+}
+
+model FlightSearch {
+  id                   String             @id @default(cuid())
+  availabilityWindowId String
+  availabilityWindow   AvailabilityWindow @relation(fields: [availabilityWindowId], references: [id], onDelete: Cascade)
+
+  originIataCode      String
+  destinationIataCode String
+  departDate          DateTime
+  returnDate          DateTime?
+
+  provider          String   @default("amadeus")
+  rawResponse       Json
+  cheapestPriceCents Int?
+  currency          String?
+
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([availabilityWindowId])
+  @@index([originIataCode, destinationIataCode, departDate])
+}
