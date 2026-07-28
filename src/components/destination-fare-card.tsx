@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { FIONA, JAKE } from "@/lib/people";
 
 export type TripOption = {
@@ -9,6 +9,8 @@ export type TripOption = {
   fareFiona: number;
   fareJake: number;
   total: number;
+  bookUrlFiona?: string;
+  bookUrlJake?: string;
 };
 
 export default function DestinationFareCard({
@@ -38,25 +40,46 @@ export default function DestinationFareCard({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <FareCell label={`${FIONA.name} · ${FIONA.airport.iataCode}`} price={option.fareFiona} />
-        <FareCell label={`${JAKE.name} · ${JAKE.airport.iataCode}`} price={option.fareJake} />
+        <FareCell
+          label={`${FIONA.name} · ${FIONA.airport.iataCode}`}
+          price={option.fareFiona}
+          bookUrl={option.bookUrlFiona}
+        />
+        <FareCell
+          label={`${JAKE.name} · ${JAKE.airport.iataCode}`}
+          price={option.fareJake}
+          bookUrl={option.bookUrlJake}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-surface-border pt-3 text-sm">
         <span className="text-muted">Combined total</span>
-        <span className="font-semibold">${option.total}</span>
+        <span className="font-semibold">${option.total.toFixed(2)}</span>
       </div>
     </div>
   );
 }
 
-function FareCell({ label, price }: { label: string; price: number }) {
+function FareCell({ label, price, bookUrl }: { label: string; price: number; bookUrl?: string }) {
   return (
     <div className="rounded-xl bg-background px-3 py-2">
       <p className="text-xs text-muted">{label}</p>
-      <p className="text-lg font-semibold">
-        {price === 0 ? "Home" : `$${price}`}
-      </p>
+      <p className="text-lg font-semibold">{price === 0 ? "Home" : `$${price.toFixed(2)}`}</p>
+      {price > 0 && (
+        bookUrl ? (
+          <a
+            href={bookUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            Book flight
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <p className="mt-1 text-xs text-muted">Estimate</p>
+        )
+      )}
     </div>
   );
 }

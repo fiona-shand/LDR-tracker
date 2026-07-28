@@ -1,12 +1,50 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import DestinationFareCard, { type TripOption } from "@/components/destination-fare-card";
-import { getAvailabilitySnapshot, getUpcomingWeekends, getWeekendBySaturdayIso } from "@/lib/availability";
+import {
+  getAvailabilitySnapshot,
+  getUpcomingWeekends,
+  getWeekendBySaturdayIso,
+  type WeekendAvailability,
+} from "@/lib/availability";
 import { getDestinationsOrSample } from "@/lib/destinations-data";
+import { flightBookingUrl, isFlightSearchConfigured, searchCheapestFare } from "@/lib/flights";
 import { mockFare } from "@/lib/mock-fares";
 import { FIONA, JAKE } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
+
+type Fare = { price: number; bookUrl?: string };
+
+async function getFare(
+  originIataCode: string,
+  destinationIataCode: string,
+  weekend: WeekendAvailability | null,
+): Promise<Fare> {
+  if (originIataCode === destinationIataCode) return { price: 0 };
+
+  if (weekend) {
+    const quote = await searchCheapestFare({
+      originIataCode,
+      destinationIataCode,
+      departDate: weekend.saturday,
+      returnDate: weekend.sunday,
+    });
+    if (quote) {
+      return {
+        price: quote.priceCents / 100,
+        bookUrl: flightBookingUrl({
+          originIataCode,
+          destinationIataCode,
+          departDate: weekend.saturday,
+          returnDate: weekend.sunday,
+        }),
+      };
+    }
+  }
+
+  return { price: mockFare(originIataCode, destinationIataCode) };
+}
 
 export default async function SearchPage({
   searchParams,
@@ -22,18 +60,29 @@ export default async function SearchPage({
     upcomingFreeWeekends[0] ??
     null;
 
-  const { destinations, isSample } = await getDestinationsOrSample();
+  const { destinations, isSample: isSampleDestinations } = await getDestinationsOrSample();
+
+  const [jakeVisitFare, fionaVisitFare, ...meetFares] = await Promise.all([
+    getFare(FIONA.airport.iataCode, JAKE.airport.iataCode, weekend),
+    getFare(JAKE.airport.iataCode, FIONA.airport.iataCode, weekend),
+    ...destinations.flatMap((d) => [
+      getFare(FIONA.airport.iataCode, d.iataCode, weekend),
+      getFare(JAKE.airport.iataCode, d.iataCode, weekend),
+    ]),
+  ]);
+
+  const usedRealFares = [jakeVisitFare, fionaVisitFare, ...meetFares].some((f) => f.bookUrl);
 
   const visitJake: TripOption = {
     key: "visit-jake",
     title: `Visit ${JAKE.name}`,
     subtitle: JAKE.airport.city,
     iataCode: JAKE.airport.iataCode,
-    fareFiona: mockFare(FIONA.airport.iataCode, JAKE.airport.iataCode),
+    fareFiona: jakeVisitFare.price,
     fareJake: 0,
-    total: 0,
+    total: jakeVisitFare.price,
+    bookUrlFiona: jakeVisitFare.bookUrl,
   };
-  visitJake.total = visitJake.fareFiona + visitJake.fareJake;
 
   const visitFiona: TripOption = {
     key: "visit-fiona",
@@ -41,22 +90,24 @@ export default async function SearchPage({
     subtitle: FIONA.airport.city,
     iataCode: FIONA.airport.iataCode,
     fareFiona: 0,
-    fareJake: mockFare(JAKE.airport.iataCode, FIONA.airport.iataCode),
-    total: 0,
+    fareJake: fionaVisitFare.price,
+    total: fionaVisitFare.price,
+    bookUrlJake: fionaVisitFare.bookUrl,
   };
-  visitFiona.total = visitFiona.fareFiona + visitFiona.fareJake;
 
-  const meetOptions: TripOption[] = destinations.map((d) => {
-    const fareFiona = mockFare(FIONA.airport.iataCode, d.iataCode);
-    const fareJake = mockFare(JAKE.airport.iataCode, d.iataCode);
+  const meetOptions: TripOption[] = destinations.map((d, i) => {
+    const fionaFare = meetFares[i * 2];
+    const jakeFare = meetFares[i * 2 + 1];
     return {
       key: d.id,
       title: `Meet in ${d.cityName}`,
       subtitle: "Halfway-ish",
       iataCode: d.iataCode,
-      fareFiona,
-      fareJake,
-      total: fareFiona + fareJake,
+      fareFiona: fionaFare.price,
+      fareJake: jakeFare.price,
+      total: fionaFare.price + jakeFare.price,
+      bookUrlFiona: fionaFare.bookUrl,
+      bookUrlJake: jakeFare.bookUrl,
     };
   });
 
@@ -110,10 +161,16 @@ export default async function SearchPage({
         </p>
       )}
 
-      {isSample && (
+      {isSampleDestinations && (
         <p className="rounded-2xl border border-surface-border bg-surface p-3 text-xs text-muted">
-          Showing sample destinations and placeholder fares — connect a
-          database and a flight search provider to see real results.
+          Showing sample destinations — connect a database to add your own.
+        </p>
+      )}
+      {!usedRealFares && (
+        <p className="rounded-2xl border border-surface-border bg-surface p-3 text-xs text-muted">
+          {isFlightSearchConfigured()
+            ? "Couldn't get live fares for this weekend — showing placeholder prices instead."
+            : "Showing placeholder fares — set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET to see real prices."}
         </p>
       )}
 
