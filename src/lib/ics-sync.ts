@@ -4,9 +4,9 @@ import { prisma } from "@/lib/db";
 
 const HORIZON_DAYS = 200;
 
-function summaryText(summary: ical.VEvent["summary"]): string | undefined {
-  if (!summary) return undefined;
-  return typeof summary === "string" ? summary : summary.val;
+function textValue(value: string | ical.ParameterValue | undefined): string | undefined {
+  if (!value) return undefined;
+  return typeof value === "string" ? value : value.val;
 }
 
 type NormalizedEvent = {
@@ -16,6 +16,42 @@ type NormalizedEvent = {
   endsAt: Date;
   isAllDay: boolean;
 };
+
+// Reminders that show up on the calendar but don't actually stop travel.
+const NON_BLOCKING_TITLE_PATTERN = /\bpayday\b/i;
+const VIDEO_CALL_LINK_PATTERN = /zoom\.us|meet\.google\.com|teams\.microsoft\.com|webex\.com|whereby\.com/i;
+const MEETING_TITLE_PATTERN = /\b(meeting|call|sync|standup|stand-up|1:1|one-on-one|check-in)\b/i;
+const SHORT_MEETING_MAX_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Whether an event should count as "unavailable" for weekend planning.
+ * Filters out things that show up on a calendar but don't actually block
+ * travel: paydays and similar reminders, events explicitly marked "free"
+ * (iCal TRANSPARENT), and short online meetings that can be taken from
+ * anywhere.
+ */
+function isBlockingEvent(details: {
+  title?: string;
+  location?: string;
+  description?: string;
+  transparency?: string;
+  isAllDay: boolean;
+  startsAt: Date;
+  endsAt: Date;
+}): boolean {
+  if (details.transparency === "TRANSPARENT") return false;
+  if (details.title && NON_BLOCKING_TITLE_PATTERN.test(details.title)) return false;
+
+  const durationMs = details.endsAt.getTime() - details.startsAt.getTime();
+  if (!details.isAllDay && durationMs <= SHORT_MEETING_MAX_MS) {
+    const isOnlineMeeting =
+      VIDEO_CALL_LINK_PATTERN.test(`${details.location ?? ""} ${details.description ?? ""}`) ||
+      (!!details.title && MEETING_TITLE_PATTERN.test(details.title));
+    if (isOnlineMeeting) return false;
+  }
+
+  return true;
+}
 
 export function normalizeIcsText(text: string): NormalizedEvent[] {
   const parsed = ical.sync.parseICS(text);
@@ -35,9 +71,23 @@ export function normalizeIcsText(text: string): NormalizedEvent[] {
     if (event.rrule) {
       const instances = ical.expandRecurringEvent(event, { from: today, to: horizonEnd });
       for (const instance of instances) {
+        const title = textValue(instance.summary);
+        if (
+          !isBlockingEvent({
+            title,
+            location: textValue(instance.event.location),
+            description: textValue(instance.event.description),
+            transparency: instance.event.transparency,
+            isAllDay: instance.isFullDay,
+            startsAt: instance.start,
+            endsAt: instance.end,
+          })
+        ) {
+          continue;
+        }
         normalized.push({
           externalEventId: `${event.uid}-${instance.start.toISOString()}`,
-          title: summaryText(instance.summary),
+          title,
           startsAt: instance.start,
           endsAt: instance.end,
           isAllDay: instance.isFullDay,
@@ -49,13 +99,28 @@ export function normalizeIcsText(text: string): NormalizedEvent[] {
     const endsAt = event.end ?? event.start;
     if (endsAt < today || event.start > horizonEnd) continue;
 
+    const title = textValue(event.summary);
+    const isAllDay = event.datetype === "date";
+    if (
+      !isBlockingEvent({
+        title,
+        location: textValue(event.location),
+        description: textValue(event.description),
+        transparency: event.transparency,
+        isAllDay,
+        startsAt: event.start,
+        endsAt,
+      })
+    ) {
+      continue;
+    }
+
     normalized.push({
-      externalEventId:
-        event.uid ?? `${event.start.toISOString()}-${summaryText(event.summary) ?? "event"}`,
-      title: summaryText(event.summary),
+      externalEventId: event.uid ?? `${event.start.toISOString()}-${title ?? "event"}`,
+      title,
       startsAt: event.start,
       endsAt,
-      isAllDay: event.datetype === "date",
+      isAllDay,
     });
   }
 
