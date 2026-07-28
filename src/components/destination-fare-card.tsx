@@ -20,7 +20,7 @@ export default function DestinationFareCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border bg-surface p-5 shadow-sm ${
+      className={`rounded-2xl border bg-surface p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
         best ? "border-accent ring-1 ring-accent" : "border-surface-border"
       }`}
     >

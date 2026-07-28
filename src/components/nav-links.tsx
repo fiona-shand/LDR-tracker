@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 const LINKS = [
   { href: "/", label: "Calendar" },
@@ -13,20 +14,25 @@ export default function NavLinks() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-6 text-sm">
+    <nav className="flex items-center gap-1 text-sm">
       {LINKS.map((link) => {
         const active = pathname === link.href;
         return (
           <Link
             key={link.href}
             href={link.href}
-            className={
-              active
-                ? "font-medium text-foreground"
-                : "text-muted transition-colors hover:text-foreground"
-            }
+            className={`relative rounded-full px-3 py-1.5 transition-colors ${
+              active ? "text-foreground" : "text-muted hover:text-foreground"
+            }`}
           >
-            {link.label}
+            {active && (
+              <motion.span
+                layoutId="nav-active-pill"
+                className="absolute inset-0 rounded-full bg-accent-soft"
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+              />
+            )}
+            <span className={`relative ${active ? "font-medium" : ""}`}>{link.label}</span>
           </Link>
         );
       })}

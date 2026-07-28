@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { MapPin, Search } from "lucide-react";
 import { searchAirports, type AirportResult } from "@/lib/airport-search";
 
@@ -61,48 +62,62 @@ export default function DestinationSearchInput() {
           onKeyDown={handleKeyDown}
           placeholder="Search a city, e.g. Tokyo"
           autoComplete="off"
-          className="w-full rounded-lg border border-surface-border bg-background py-2 pl-9 pr-3 outline-none focus:border-accent"
+          className="w-full rounded-lg border border-surface-border bg-background py-2 pl-9 pr-3 outline-none transition-colors focus:border-accent"
         />
       </div>
 
-      {open && results.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-surface-border bg-surface py-1 shadow-lg">
-          {results.map((option, i) => (
-            <li key={option.iataCode + option.name}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(option)}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                  i === highlight ? "bg-accent-soft text-accent" : "hover:bg-accent-soft/50"
-                }`}
-              >
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1 truncate">
-                  {option.isMetro ? (
-                    <>
-                      {option.cityName}
-                      <span className="text-muted"> (all airports)</span>
-                    </>
-                  ) : (
-                    <>
-                      {option.cityName}
-                      <span className="text-muted"> — {option.name}</span>
-                    </>
-                  )}
-                </span>
-                <span className="shrink-0 font-mono text-xs text-muted">{option.iataCode}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AnimatePresence>
+        {open && results.length > 0 && (
+          <motion.ul
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className="absolute z-20 mt-1 max-h-64 w-full origin-top overflow-auto rounded-lg border border-surface-border bg-surface py-1 shadow-lg"
+          >
+            {results.map((option, i) => (
+              <li key={option.iataCode + option.name}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => choose(option)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                    i === highlight ? "bg-accent-soft text-accent" : "hover:bg-accent-soft/50"
+                  }`}
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1 truncate">
+                    {option.isMetro ? (
+                      <>
+                        {option.cityName}
+                        <span className="text-muted"> (all airports)</span>
+                      </>
+                    ) : (
+                      <>
+                        {option.cityName}
+                        <span className="text-muted"> — {option.name}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs text-muted">{option.iataCode}</span>
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
 
-      {open && !selected && query.trim().length >= 2 && results.length === 0 && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-muted shadow-lg">
-          No matches
-        </div>
-      )}
+        {open && !selected && query.trim().length >= 2 && results.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className="absolute z-20 mt-1 w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-muted shadow-lg"
+          >
+            No matches
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

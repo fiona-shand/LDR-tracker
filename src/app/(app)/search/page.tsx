@@ -87,7 +87,7 @@ export default async function SearchPage({
                   <Link
                     key={iso}
                     href={`/search?weekend=${iso}`}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    className={`rounded-full border px-3 py-1 text-xs transition-all active:scale-95 ${
                       active
                         ? "border-accent bg-accent-soft text-accent"
                         : "border-surface-border text-muted hover:border-accent hover:text-accent"

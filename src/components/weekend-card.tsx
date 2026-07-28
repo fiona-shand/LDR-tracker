@@ -11,7 +11,7 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
     return (
       <Link
         href={`/search?weekend=${saturdayIso}`}
-        className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
+        className="group flex items-center justify-between rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99]"
       >
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-white">
@@ -22,7 +22,10 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
             <p className="text-sm text-muted">Both free — plan a trip</p>
           </div>
         </div>
-        <span className="text-sm font-medium text-accent">Search flights →</span>
+        <span className="flex items-center gap-1 text-sm font-medium text-accent">
+          Search flights
+          <span className="transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+        </span>
       </Link>
     );
   }

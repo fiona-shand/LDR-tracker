@@ -39,7 +39,7 @@ export default function MonthCalendar({
           const bothFreeWeekend = !isPast && isWeekendDay && status === "both-free";
           const isTodayCell = isToday(day);
 
-          const base = "flex h-9 items-center justify-center rounded-lg text-sm transition-colors";
+          const base = "flex h-9 items-center justify-center rounded-lg text-sm transition-all duration-150";
 
           if (bothFreeWeekend) {
             const saturdayIso = format(dow === 6 ? day : addDays(day, -1), "yyyy-MM-dd");
@@ -47,7 +47,7 @@ export default function MonthCalendar({
               <Link
                 key={day.toISOString()}
                 href={`/search?weekend=${saturdayIso}`}
-                className={`${base} bg-gradient-to-br from-accent to-accent-2 font-semibold text-white shadow-sm hover:opacity-90`}
+                className={`${base} bg-gradient-to-br from-accent to-accent-2 font-semibold text-white shadow-sm hover:scale-110 hover:opacity-90 hover:shadow-md active:scale-95`}
               >
                 {format(day, "d")}
               </Link>

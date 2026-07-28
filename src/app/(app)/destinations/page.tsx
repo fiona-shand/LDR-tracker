@@ -32,7 +32,7 @@ export default async function DestinationsPage() {
         {destinations.map((destination) => (
           <li
             key={destination.id}
-            className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface px-4 py-3 shadow-sm"
+            className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
           >
             <span className="flex min-w-0 items-center gap-2">
               <MapPin className="h-4 w-4 shrink-0 text-accent" />
@@ -45,7 +45,7 @@ export default async function DestinationsPage() {
                 <button
                   type="submit"
                   aria-label="Remove destination"
-                  className="shrink-0 rounded-full p-1 text-muted hover:bg-accent-soft hover:text-accent"
+                  className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-accent-soft hover:text-accent"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -72,7 +72,7 @@ export default async function DestinationsPage() {
                 <input type="hidden" name="iataCode" value={s.iataCode} />
                 <button
                   type="submit"
-                  className="flex items-center gap-1 rounded-full border border-surface-border px-3 py-1.5 text-sm hover:border-accent hover:text-accent"
+                  className="flex items-center gap-1 rounded-full border border-surface-border px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent active:scale-95"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {s.cityName}
@@ -91,7 +91,7 @@ export default async function DestinationsPage() {
         <DestinationSearchInput />
         <button
           type="submit"
-          className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 font-medium text-white transition-opacity hover:opacity-90"
+          className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
         >
           Add destination
         </button>

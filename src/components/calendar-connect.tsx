@@ -11,7 +11,7 @@ export default function CalendarConnect({ snapshot }: { snapshot: AvailabilitySn
         return (
           <div
             key={person.id}
-            className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm"
+            className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="flex items-center justify-between">
               <p className="font-medium">{person.name}&apos;s calendar</p>
@@ -31,12 +31,12 @@ export default function CalendarConnect({ snapshot }: { snapshot: AvailabilitySn
                 name="file"
                 accept=".ics"
                 required
-                className="flex-1 truncate text-xs text-muted file:mr-2 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-accent"
+                className="flex-1 truncate text-xs text-muted file:mr-2 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-accent file:transition-colors hover:file:bg-accent/20"
               />
               <button
                 type="submit"
                 aria-label={`Upload ${person.name}'s .ics file`}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform hover:scale-105 active:scale-95"
               >
                 <UploadCloud className="h-4 w-4" />
               </button>
