@@ -37,7 +37,12 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
       </span>
       <div>
         <p className="font-medium">{dateLabel}</p>
-        <p className="text-sm text-muted">{weekend.busyNames.join(" & ")} busy</p>
+        <p className="text-sm text-muted">
+          {weekend.busyDetails
+            .map((d) => (d.titles.length > 0 ? `${d.name} (${d.titles.join(", ")})` : d.name))
+            .join(" & ")}{" "}
+          busy
+        </p>
       </div>
     </div>
   );

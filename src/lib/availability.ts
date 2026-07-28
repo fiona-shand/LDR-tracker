@@ -9,10 +9,13 @@ const HORIZON_DAYS = 200;
 
 export type AvailabilitySnapshot = {
   busyDates: Record<PersonId, Set<string>>;
+  busyEvents: Record<PersonId, Record<string, string[]>>;
   sources: Record<PersonId, "real" | "mock">;
 };
 
-async function getRealBusyDates(personId: PersonId): Promise<Set<string> | null> {
+async function getRealBusyData(
+  personId: PersonId,
+): Promise<{ dates: Set<string>; events: Record<string, string[]> } | null> {
   try {
     const connection = await prisma.calendarConnection.findFirst({
       where: { personId, provider: "ICS" },
@@ -23,19 +26,24 @@ async function getRealBusyDates(personId: PersonId): Promise<Set<string> | null>
     const horizonEnd = addDays(today, HORIZON_DAYS);
     const blocks = await prisma.busyBlock.findMany({
       where: { personId, startsAt: { lte: horizonEnd }, endsAt: { gte: today } },
-      select: { startsAt: true, endsAt: true },
+      select: { startsAt: true, endsAt: true, title: true },
     });
 
     const dates = new Set<string>();
+    const events: Record<string, string[]> = {};
     for (const block of blocks) {
+      const title = block.title?.trim() || "Busy";
       let cursor = startOfDay(block.startsAt);
       const end = startOfDay(block.endsAt);
       while (cursor <= end) {
-        dates.add(format(cursor, "yyyy-MM-dd"));
+        const iso = format(cursor, "yyyy-MM-dd");
+        dates.add(iso);
+        const forDay = (events[iso] ??= []);
+        if (!forDay.includes(title)) forDay.push(title);
         cursor = addDays(cursor, 1);
       }
     }
-    return dates;
+    return { dates, events };
   } catch {
     return null;
   }
@@ -43,24 +51,36 @@ async function getRealBusyDates(personId: PersonId): Promise<Set<string> | null>
 
 export async function getAvailabilitySnapshot(): Promise<AvailabilitySnapshot> {
   const busyDates = {} as Record<PersonId, Set<string>>;
+  const busyEvents = {} as Record<PersonId, Record<string, string[]>>;
   const sources = {} as Record<PersonId, "real" | "mock">;
 
   for (const person of PEOPLE) {
-    const real = await getRealBusyDates(person.id);
+    const real = await getRealBusyData(person.id);
     if (real) {
-      busyDates[person.id] = real;
+      busyDates[person.id] = real.dates;
+      busyEvents[person.id] = real.events;
       sources[person.id] = "real";
     } else {
       busyDates[person.id] = getMockBusyDates(person.id);
+      busyEvents[person.id] = {};
       sources[person.id] = "mock";
     }
   }
 
-  return { busyDates, sources };
+  return { busyDates, busyEvents, sources };
 }
 
 function isFree(snapshot: AvailabilitySnapshot, personId: PersonId, date: Date): boolean {
   return !snapshot.busyDates[personId].has(format(date, "yyyy-MM-dd"));
+}
+
+/** Event titles (e.g. "Concert", "Trip to Rome") that make this person busy on this day. */
+export function getBusyTitles(
+  snapshot: AvailabilitySnapshot,
+  personId: PersonId,
+  date: Date,
+): string[] {
+  return snapshot.busyEvents[personId][format(date, "yyyy-MM-dd")] ?? [];
 }
 
 export type DayStatus = "both-free" | "one-busy" | "both-busy";
@@ -83,14 +103,30 @@ export type WeekendAvailability = {
   sunday: Date;
   bothFree: boolean;
   busyNames: string[];
+  busyDetails: { name: string; titles: string[] }[];
 };
 
 function weekendFor(snapshot: AvailabilitySnapshot, saturday: Date): WeekendAvailability {
   const sunday = addDays(saturday, 1);
-  const busyNames = PEOPLE.filter(
+  const busyPeople = PEOPLE.filter(
     (p) => !isFree(snapshot, p.id, saturday) || !isFree(snapshot, p.id, sunday),
-  ).map((p) => p.name);
-  return { saturday, sunday, bothFree: busyNames.length === 0, busyNames };
+  );
+  const busyDetails = busyPeople.map((p) => ({
+    name: p.name,
+    titles: Array.from(
+      new Set([
+        ...getBusyTitles(snapshot, p.id, saturday),
+        ...getBusyTitles(snapshot, p.id, sunday),
+      ]),
+    ),
+  }));
+  return {
+    saturday,
+    sunday,
+    bothFree: busyPeople.length === 0,
+    busyNames: busyPeople.map((p) => p.name),
+    busyDetails,
+  };
 }
 
 export function getUpcomingWeekends(

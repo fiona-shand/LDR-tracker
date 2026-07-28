@@ -1,6 +1,7 @@
 import { addDays, eachDayOfInterval, endOfMonth, format, isToday, startOfDay, startOfMonth } from "date-fns";
 import Link from "next/link";
-import { getDayStatus, type AvailabilitySnapshot } from "@/lib/availability";
+import { getBusyTitles, getDayStatus, type AvailabilitySnapshot } from "@/lib/availability";
+import { PEOPLE } from "@/lib/people";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -39,7 +40,13 @@ export default function MonthCalendar({
           const bothFreeWeekend = !isPast && isWeekendDay && status === "both-free";
           const isTodayCell = isToday(day);
 
-          const base = "flex h-9 items-center justify-center rounded-lg text-sm transition-all duration-150";
+          const dayEvents = PEOPLE.map((p) => ({
+            name: p.name,
+            titles: getBusyTitles(snapshot, p.id, day),
+          })).filter((e) => e.titles.length > 0);
+          const tooltip = dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
+
+          const base = "relative flex h-9 items-center justify-center rounded-lg text-sm transition-all duration-150";
 
           if (bothFreeWeekend) {
             const saturdayIso = format(dow === 6 ? day : addDays(day, -1), "yyyy-MM-dd");
@@ -65,9 +72,13 @@ export default function MonthCalendar({
           return (
             <div
               key={day.toISOString()}
+              title={tooltip}
               className={`${base} ${statusClasses} ${isTodayCell ? "ring-1 ring-accent" : ""}`}
             >
               {format(day, "d")}
+              {dayEvents.length > 0 && !isPast && (
+                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-accent" />
+              )}
             </div>
           );
         })}
