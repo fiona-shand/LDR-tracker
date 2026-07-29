@@ -1,7 +1,11 @@
 import { addDays, eachDayOfInterval, endOfMonth, format, isToday, startOfDay, startOfMonth } from "date-fns";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
-import { getWeekendBySaturdayIso, type AvailabilitySnapshot } from "@/lib/availability";
+import {
+  getWeekendBySaturdayIso,
+  isTogetherDay,
+  type AvailabilitySnapshot,
+} from "@/lib/availability";
 import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -26,9 +30,10 @@ function buildWeeks(days: Date[], leadingBlanks: number): (Date | null)[][] {
 
 /**
  * A compact month calendar for picking a weekend to search, in the same
- * spirit as Skyscanner's date picker: free Friday-Sunday windows are
- * highlighted and clickable, our "worth booking" suggestions get a star,
- * and the currently-selected weekend is filled solid.
+ * spirit as Skyscanner's date picker. Every Friday/Saturday/Sunday is
+ * selectable regardless of known free/busy status -- with only one
+ * calendar connected, most weekends can't be confirmed "free" yet, and
+ * that shouldn't block searching a fare for them.
  */
 export default function WeekendDatePicker({
   snapshot,
@@ -90,12 +95,9 @@ export default function WeekendDatePicker({
           const isPast = day < today;
           const isTodayCell = isToday(day);
           const tripSaturday = saturdayForTripWindow(day);
-          const tripWeekend = tripSaturday
-            ? getWeekendBySaturdayIso(snapshot, format(tripSaturday, "yyyy-MM-dd"))
-            : null;
-          const free = !isPast && !!tripWeekend?.bothFree;
 
-          if (!free || !tripSaturday) {
+          // Mon-Thu and past days aren't valid weekend-trip anchors -- not selectable.
+          if (!tripSaturday || isPast) {
             return (
               <div
                 key={i}
@@ -107,21 +109,43 @@ export default function WeekendDatePicker({
           }
 
           const saturdayIso = format(tripSaturday, "yyyy-MM-dd");
-          const suggested = tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
+          const tripWeekend = getWeekendBySaturdayIso(snapshot, saturdayIso);
+          const free = !!tripWeekend?.bothFree;
+          const together = isTogetherDay(snapshot, day);
+          const busy = !free && !together && (tripWeekend?.busyNames.length ?? 0) > 0;
+          const suggested = free && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
           const selected = saturdayIso === selectedSaturdayIso;
+
+          const fillClasses = selected
+            ? "bg-accent text-white"
+            : suggested
+              ? "bg-day-suggested text-day-suggested-ink ring-2 ring-day-suggested-ink"
+              : free
+                ? "bg-day-free text-day-free-ink"
+                : together
+                  ? "bg-day-together text-day-together-ink"
+                  : busy
+                    ? "bg-day-busy text-day-busy-ink"
+                    : "border border-dashed border-surface-border text-muted/70";
+
+          const tooltip = suggested
+            ? "Suggested — it's been a while since your last trip"
+            : free
+              ? "Free Friday–Sunday"
+              : together
+                ? "Together"
+                : busy
+                  ? `${tripWeekend!.busyNames.join(" & ")} busy`
+                  : tripWeekend && tripWeekend.unknownNames.length > 0
+                    ? `${tripWeekend.unknownNames.join(" & ")} ${tripWeekend.unknownNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
+                    : undefined;
 
           return (
             <Link
               key={i}
               href={`${basePath}?weekend=${saturdayIso}`}
-              title={suggested ? "Suggested — it's been a while since your last trip" : "Free Friday–Sunday"}
-              className={`${CELL} relative hover:scale-110 active:scale-95 ${
-                selected
-                  ? "bg-accent text-white"
-                  : suggested
-                    ? "bg-day-suggested text-day-suggested-ink ring-2 ring-day-suggested-ink"
-                    : "bg-day-free text-day-free-ink"
-              }`}
+              title={tooltip}
+              className={`${CELL} relative hover:scale-110 active:scale-95 ${fillClasses}`}
             >
               {format(day, "d")}
               {suggested && !selected && (
@@ -135,6 +159,9 @@ export default function WeekendDatePicker({
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-surface-border pt-3 text-[11px] text-muted">
         <LegendDot className="bg-day-free" label="Free" />
         <LegendDot className="bg-day-suggested" label="Suggested" />
+        <LegendDot className="bg-day-together" label="Together" />
+        <LegendDot className="bg-day-busy" label="Busy" />
+        <LegendDot className="border border-dashed border-surface-border" label="Unknown" />
         <LegendDot className="bg-accent" label="Selected" />
       </div>
     </div>

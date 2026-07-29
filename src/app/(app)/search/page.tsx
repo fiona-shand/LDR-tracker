@@ -22,10 +22,11 @@ export default async function SearchPage({
   const { weekend: weekendParam, month: monthParam } = await searchParams;
 
   const snapshot = await getAvailabilitySnapshot();
-  const upcomingFreeWeekends = getUpcomingWeekends(snapshot, 40).filter((w) => w.bothFree);
+  const upcomingWeekends = getUpcomingWeekends(snapshot, 40);
   const weekend =
     (weekendParam ? getWeekendBySaturdayIso(snapshot, weekendParam) : null) ??
-    upcomingFreeWeekends[0] ??
+    upcomingWeekends.find((w) => w.bothFree) ??
+    upcomingWeekends[0] ??
     null;
 
   const todayMonth = startOfMonth(new Date());
@@ -77,11 +78,8 @@ export default async function SearchPage({
             </div>
           ) : (
             <p className="rounded-2xl border border-surface-border bg-surface p-4 text-sm text-muted">
-              No fully-free weekend in the next {MONTHS_AHEAD} months — check the{" "}
-              <Link href="/" className="text-accent underline">
-                calendar
-              </Link>{" "}
-              for details.
+              Pick a Friday, Saturday, or Sunday on the calendar to compare fares for that
+              weekend.
             </p>
           )}
 
