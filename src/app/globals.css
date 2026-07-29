@@ -13,15 +13,15 @@
   --series-jake: #eb6834;
   --chart-grid: #e1e0d9;
   /* Calendar day-marker palette (flat pastel circles, not gradients) */
-  --day-free: #f6cede;
-  --day-free-ink: #9c3f61;
-  --day-suggested: #c9ecda;
-  --day-suggested-ink: #1f7a52;
+  --day-free: #d3e3fb;
+  --day-free-ink: #2f5fa8;
+  --day-suggested: #e8dbf7;
+  --day-suggested-ink: #6b3fa0;
   --day-busy: #faf1cf;
   --day-busy-ink: #8a6d1f;
-  --day-together: #1a1a1a;
+  --day-together: #e0779b;
   --day-together-ink: #ffffff;
-  --day-together-bar: #dcdcdc;
+  --day-together-bar: #f6d7e2;
 }
 
 @theme inline {
@@ -62,15 +62,15 @@
     --series-fiona: #3987e5;
     --series-jake: #d95926;
     --chart-grid: #2c2c2a;
-    --day-free: #4a2536;
-    --day-free-ink: #f3b8cd;
-    --day-suggested: #143829;
-    --day-suggested-ink: #7fdcb2;
+    --day-free: #1e3a5f;
+    --day-free-ink: #9dc4f7;
+    --day-suggested: #3a2854;
+    --day-suggested-ink: #d4b8f0;
     --day-busy: #3a3218;
     --day-busy-ink: #e8cf7a;
-    --day-together: #f1f5f9;
-    --day-together-ink: #0f172a;
-    --day-together-bar: #3a3a3a;
+    --day-together: #c85c81;
+    --day-together-ink: #ffffff;
+    --day-together-bar: #4a2e37;
   }
 }
 

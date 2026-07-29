@@ -15,6 +15,7 @@ import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const CIRCLE = "flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm sm:text-base font-medium transition-transform duration-150";
+const ROW_HEIGHT = "h-16 sm:h-20";
 
 /** Saturday of the Fri-Sun trip window this day belongs to, or null if it's not part of one. */
 function saturdayForTripWindow(day: Date): Date | null {
@@ -55,6 +56,16 @@ function barsForRow(week: (Date | null)[], intervals: DateInterval[]): BarSegmen
     });
   }
   return segments;
+}
+
+function DayTooltip({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-[12rem] -translate-x-1/2 rounded-lg bg-foreground px-2.5 py-1.5 text-center text-[11px] font-medium leading-snug text-background shadow-lg group-hover:block group-focus-within:block">
+      {text}
+      <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-foreground" />
+    </div>
+  );
 }
 
 export default function MonthCalendar({
@@ -101,30 +112,35 @@ export default function MonthCalendar({
     const dayEvents = PEOPLE.map((p) => ({ name: p.name, titles: getBusyTitles(snapshot, p.id, day) })).filter(
       (e) => e.titles.length > 0,
     );
+    const eventText = dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
     const tooltip =
-      status === "unknown" && dayEvents.length === 0
+      status === "unknown" && !eventText
         ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
-        : dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
+        : suggested
+          ? `${eventText ? `${eventText} · ` : ""}Suggested — it's been a while since your last trip`
+          : tripFree
+            ? "Free Friday–Sunday"
+            : eventText;
 
     const todayRing = isTodayCell ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "";
 
     if (together) {
       if (!isEndpoint) {
         return (
-          <div
-            key={day.toISOString()}
-            title={tooltip}
-            className={`flex items-center justify-center py-1 text-sm font-medium text-foreground sm:text-base ${isPast ? "opacity-60" : ""}`}
-          >
-            {format(day, "d")}
+          <div key={day.toISOString()} className={`group relative flex h-full items-center justify-center ${isPast ? "opacity-60" : ""}`}>
+            <span tabIndex={0} className="text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface rounded-full sm:text-base">
+              {format(day, "d")}
+            </span>
+            <DayTooltip text={tooltip} />
           </div>
         );
       }
       return (
-        <div key={day.toISOString()} title={tooltip} className={`flex items-center justify-center py-1 ${isPast ? "opacity-60" : ""}`}>
-          <span className={`${CIRCLE} bg-day-together font-semibold text-day-together-ink ${todayRing}`}>
+        <div key={day.toISOString()} className={`group relative flex h-full items-center justify-center ${isPast ? "opacity-60" : ""}`}>
+          <span tabIndex={0} className={`${CIRCLE} bg-day-together font-semibold text-day-together-ink outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${todayRing}`}>
             {format(day, "d")}
           </span>
+          <DayTooltip text={tooltip} />
         </div>
       );
     }
@@ -132,27 +148,21 @@ export default function MonthCalendar({
     if (tripFree) {
       const saturdayIso = format(tripSaturday!, "yyyy-MM-dd");
       return (
-        <Link
-          key={day.toISOString()}
-          href={`/search?weekend=${saturdayIso}`}
-          title={
-            suggested
-              ? "Free Friday–Sunday — suggested, it's been a while since your last trip"
-              : "Free Friday–Sunday — plan a trip"
-          }
-          className="flex items-center justify-center py-1"
-        >
-          <span
-            className={`${CIRCLE} relative bg-day-free text-day-free-ink hover:scale-105 active:scale-95 ${todayRing} ${
-              suggested ? "ring-2 ring-day-suggested-ink" : ""
-            }`}
-          >
-            {format(day, "d")}
-            {suggested && (
-              <Star className="absolute -right-1 -top-1 h-3.5 w-3.5 fill-day-suggested-ink text-day-suggested-ink" />
-            )}
-          </span>
-        </Link>
+        <div key={day.toISOString()} className="group relative flex h-full items-center justify-center">
+          <Link href={`/search?weekend=${saturdayIso}`} className="flex items-center justify-center">
+            <span
+              className={`${CIRCLE} relative bg-day-free text-day-free-ink hover:scale-105 active:scale-95 ${todayRing} ${
+                suggested ? "bg-day-suggested text-day-suggested-ink" : ""
+              }`}
+            >
+              {format(day, "d")}
+              {suggested && (
+                <Star className="absolute -right-1 -top-1 h-3.5 w-3.5 fill-day-suggested-ink text-day-suggested-ink" />
+              )}
+            </span>
+          </Link>
+          <DayTooltip text={tooltip} />
+        </div>
       );
     }
 
@@ -165,8 +175,11 @@ export default function MonthCalendar({
           : "text-foreground";
 
     return (
-      <div key={day.toISOString()} title={tooltip} className="flex items-center justify-center py-1">
-        <span className={`${CIRCLE} ${fillClasses} ${todayRing}`}>{format(day, "d")}</span>
+      <div key={day.toISOString()} className="group relative flex h-full items-center justify-center">
+        <span tabIndex={0} className={`${CIRCLE} outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${fillClasses} ${todayRing}`}>
+          {format(day, "d")}
+        </span>
+        <DayTooltip text={tooltip} />
       </div>
     );
   }
@@ -213,25 +226,25 @@ export default function MonthCalendar({
         ))}
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         {weeks.map((week, weekIndex) => {
           const bars = barsForRow(week, togetherIntervals);
           return (
-            <div key={weekIndex} className="relative">
+            <div key={weekIndex} className={`relative ${ROW_HEIGHT}`}>
               {bars.length > 0 && (
                 <div className="pointer-events-none absolute inset-0 grid grid-cols-7 items-center">
                   {bars.map((seg) => (
                     <div
                       key={seg.key}
                       style={{ gridColumnStart: seg.colStart + 1, gridColumnEnd: seg.colEnd + 2 }}
-                      className={`h-9 bg-day-together-bar sm:h-11 ${seg.roundLeft ? "rounded-l-full" : ""} ${
+                      className={`h-8 bg-day-together-bar sm:h-10 ${seg.roundLeft ? "rounded-l-full" : ""} ${
                         seg.roundRight ? "rounded-r-full" : ""
                       }`}
                     />
                   ))}
                 </div>
               )}
-              <div className="relative grid grid-cols-7">
+              <div className="relative grid h-full grid-cols-7">
                 {week.map((day, i) => (day ? renderDay(day) : <div key={`blank-${weekIndex}-${i}`} />))}
               </div>
             </div>
@@ -241,7 +254,7 @@ export default function MonthCalendar({
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-surface-border pt-3 text-xs text-muted">
         <LegendSwatch className="bg-day-free" label="Free Fri–Sun" />
-        <LegendSwatch className="bg-day-free ring-2 ring-day-suggested-ink" label="Suggested" />
+        <LegendSwatch className="bg-day-suggested" label="Suggested" />
         <LegendSwatch className="bg-day-together" label="Together" />
         <LegendSwatch className="bg-day-busy" label="One or both busy" />
         <LegendSwatch className="border border-dashed border-surface-border" label="Not connected" />
