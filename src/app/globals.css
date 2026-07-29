@@ -14,8 +14,8 @@
   --series-fiona: #2a78d6;
   --series-jake: #eb6834;
   --chart-grid: #e1e0d9;
-  --together: #db2777;
-  --together-2: #ec4899;
+  --together: #4a3aa7;
+  --together-2: #6d5cd4;
 }
 
 @theme inline {
@@ -48,13 +48,13 @@
     --accent: #38bdf8;
     --accent-2: #22d3ee;
     --accent-soft: #0c2a3d;
-    --available: #22c55e;
-    --available-2: #4ade80;
+    --available: #16a34a;
+    --available-2: #22c55e;
     --series-fiona: #3987e5;
     --series-jake: #d95926;
     --chart-grid: #2c2c2a;
-    --together: #ec4899;
-    --together-2: #f472b6;
+    --together: #7c6ae0;
+    --together-2: #a78bfa;
   }
 }
 
