@@ -22,48 +22,56 @@ function configuredIcsUrl(personId: string): string | undefined {
  */
 export async function ensureAutoSyncedCalendars() {
   for (const person of PEOPLE) {
-    const rawUrl = configuredIcsUrl(person.id);
-    if (!rawUrl) continue;
-
-    let url: URL;
     try {
-      url = toFetchableIcsUrl(rawUrl);
+      const rawUrl = configuredIcsUrl(person.id);
+      if (!rawUrl) continue;
+
+      let url: URL;
+      try {
+        url = toFetchableIcsUrl(rawUrl);
+      } catch {
+        continue;
+      }
+
+      let connection = await prisma.calendarConnection.findFirst({
+        where: { personId: person.id, provider: "ICS", label: { not: PLANNED_TRIPS_LABEL } },
+      });
+
+      const stale =
+        !connection ||
+        connection.icsUrl !== url.toString() ||
+        !connection.lastSyncedAt ||
+        Date.now() - connection.lastSyncedAt.getTime() > STALE_AFTER_MS;
+
+      if (!stale) continue;
+
+      if (!connection) {
+        connection = await prisma.calendarConnection.create({
+          data: { personId: person.id, provider: "ICS", label: labelForIcsUrl(url), icsUrl: url.toString() },
+        });
+      } else if (connection.icsUrl !== url.toString()) {
+        connection = await prisma.calendarConnection.update({
+          where: { id: connection.id },
+          data: { label: labelForIcsUrl(url), icsUrl: url.toString() },
+        });
+      }
+
+      try {
+        const text = await fetchIcsText(url);
+        const normalized = normalizeIcsText(text);
+        await saveBusyBlocks(person.id, connection.id, normalized);
+      } catch {
+        try {
+          await prisma.calendarConnection.update({
+            where: { id: connection.id },
+            data: { lastSyncStatus: "error" },
+          });
+        } catch {
+          // DB unreachable too -- give up on this person's sync for now, don't take the page down.
+        }
+      }
     } catch {
-      continue;
-    }
-
-    let connection = await prisma.calendarConnection.findFirst({
-      where: { personId: person.id, provider: "ICS", label: { not: PLANNED_TRIPS_LABEL } },
-    });
-
-    const stale =
-      !connection ||
-      connection.icsUrl !== url.toString() ||
-      !connection.lastSyncedAt ||
-      Date.now() - connection.lastSyncedAt.getTime() > STALE_AFTER_MS;
-
-    if (!stale) continue;
-
-    if (!connection) {
-      connection = await prisma.calendarConnection.create({
-        data: { personId: person.id, provider: "ICS", label: labelForIcsUrl(url), icsUrl: url.toString() },
-      });
-    } else if (connection.icsUrl !== url.toString()) {
-      connection = await prisma.calendarConnection.update({
-        where: { id: connection.id },
-        data: { label: labelForIcsUrl(url), icsUrl: url.toString() },
-      });
-    }
-
-    try {
-      const text = await fetchIcsText(url);
-      const normalized = normalizeIcsText(text);
-      await saveBusyBlocks(person.id, connection.id, normalized);
-    } catch {
-      await prisma.calendarConnection.update({
-        where: { id: connection.id },
-        data: { lastSyncStatus: "error" },
-      });
+      // Never let a sync problem (network, DB, anything) crash the page that triggered it.
     }
   }
 }
