@@ -1,7 +1,6 @@
 import { addDays, format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { PEOPLE } from "@/lib/people";
-import { getMockBusyDates } from "@/lib/mock-availability";
 
 type PersonId = (typeof PEOPLE)[number]["id"];
 
@@ -10,7 +9,7 @@ const HORIZON_DAYS = 200;
 export type AvailabilitySnapshot = {
   busyDates: Record<PersonId, Set<string>>;
   busyEvents: Record<PersonId, Record<string, string[]>>;
-  sources: Record<PersonId, "real" | "mock">;
+  sources: Record<PersonId, "real" | "unconnected">;
 };
 
 async function getRealBusyData(
@@ -52,7 +51,7 @@ async function getRealBusyData(
 export async function getAvailabilitySnapshot(): Promise<AvailabilitySnapshot> {
   const busyDates = {} as Record<PersonId, Set<string>>;
   const busyEvents = {} as Record<PersonId, Record<string, string[]>>;
-  const sources = {} as Record<PersonId, "real" | "mock">;
+  const sources = {} as Record<PersonId, "real" | "unconnected">;
 
   for (const person of PEOPLE) {
     const real = await getRealBusyData(person.id);
@@ -61,9 +60,11 @@ export async function getAvailabilitySnapshot(): Promise<AvailabilitySnapshot> {
       busyEvents[person.id] = real.events;
       sources[person.id] = "real";
     } else {
-      busyDates[person.id] = getMockBusyDates(person.id);
+      // No calendar connected -- we genuinely don't know, so this person's
+      // days are "unknown", never assumed free or busy.
+      busyDates[person.id] = new Set();
       busyEvents[person.id] = {};
-      sources[person.id] = "mock";
+      sources[person.id] = "unconnected";
     }
   }
 
@@ -83,10 +84,23 @@ export function getBusyTitles(
   return snapshot.busyEvents[personId][format(date, "yyyy-MM-dd")] ?? [];
 }
 
-export type DayStatus = "both-free" | "one-busy" | "both-busy";
+type PersonDayStatus = "free" | "busy" | "unknown";
+
+function personDayStatus(
+  snapshot: AvailabilitySnapshot,
+  personId: PersonId,
+  date: Date,
+): PersonDayStatus {
+  if (snapshot.sources[personId] !== "real") return "unknown";
+  return isFree(snapshot, personId, date) ? "free" : "busy";
+}
+
+export type DayStatus = "both-free" | "one-busy" | "both-busy" | "unknown";
 
 export function getDayStatus(snapshot: AvailabilitySnapshot, date: Date): DayStatus {
-  const busyCount = PEOPLE.filter((p) => !isFree(snapshot, p.id, date)).length;
+  const statuses = PEOPLE.map((p) => personDayStatus(snapshot, p.id, date));
+  if (statuses.includes("unknown")) return "unknown";
+  const busyCount = statuses.filter((s) => s === "busy").length;
   if (busyCount === 0) return "both-free";
   if (busyCount === PEOPLE.length) return "both-busy";
   return "one-busy";
@@ -104,12 +118,18 @@ export type WeekendAvailability = {
   bothFree: boolean;
   busyNames: string[];
   busyDetails: { name: string; titles: string[] }[];
+  /** People with no calendar connected -- their status for this weekend is unknown, not free. */
+  unknownNames: string[];
 };
 
 function weekendFor(snapshot: AvailabilitySnapshot, saturday: Date): WeekendAvailability {
   const sunday = addDays(saturday, 1);
+
+  const unknownPeople = PEOPLE.filter((p) => snapshot.sources[p.id] !== "real");
   const busyPeople = PEOPLE.filter(
-    (p) => !isFree(snapshot, p.id, saturday) || !isFree(snapshot, p.id, sunday),
+    (p) =>
+      snapshot.sources[p.id] === "real" &&
+      (!isFree(snapshot, p.id, saturday) || !isFree(snapshot, p.id, sunday)),
   );
   const busyDetails = busyPeople.map((p) => ({
     name: p.name,
@@ -120,12 +140,14 @@ function weekendFor(snapshot: AvailabilitySnapshot, saturday: Date): WeekendAvai
       ]),
     ),
   }));
+
   return {
     saturday,
     sunday,
-    bothFree: busyPeople.length === 0,
+    bothFree: unknownPeople.length === 0 && busyPeople.length === 0,
     busyNames: busyPeople.map((p) => p.name),
     busyDetails,
+    unknownNames: unknownPeople.map((p) => p.name),
   };
 }
 

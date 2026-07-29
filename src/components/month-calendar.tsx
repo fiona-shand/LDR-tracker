@@ -17,6 +17,9 @@ export default function MonthCalendar({
   const leadingBlanks = start.getDay();
   const days = eachDayOfInterval({ start, end });
   const today = startOfDay(new Date());
+  const unconnectedNames = PEOPLE.filter((p) => snapshot.sources[p.id] !== "real").map(
+    (p) => p.name,
+  );
 
   return (
     <div className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm">
@@ -44,7 +47,10 @@ export default function MonthCalendar({
             name: p.name,
             titles: getBusyTitles(snapshot, p.id, day),
           })).filter((e) => e.titles.length > 0);
-          const tooltip = dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
+          const tooltip =
+            status === "unknown"
+              ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
+              : dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
 
           const base = "relative flex h-9 items-center justify-center rounded-lg text-sm transition-all duration-150";
 
@@ -63,11 +69,13 @@ export default function MonthCalendar({
 
           const statusClasses = isPast
             ? "text-muted/30"
-            : status === "both-busy"
-              ? "text-muted/50 line-through"
-              : status === "one-busy"
-                ? "bg-surface-border/40 text-muted"
-                : "text-foreground";
+            : status === "unknown"
+              ? "text-muted/40 border border-dashed border-surface-border"
+              : status === "both-busy"
+                ? "text-muted/50 line-through"
+                : status === "one-busy"
+                  ? "bg-surface-border/40 text-muted"
+                  : "text-foreground";
 
           return (
             <div

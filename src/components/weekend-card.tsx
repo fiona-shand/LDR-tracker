@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { CalendarCheck2, X } from "lucide-react";
+import { CalendarCheck2, HelpCircle, X } from "lucide-react";
 import type { WeekendAvailability } from "@/lib/availability";
 
 export default function WeekendCard({ weekend }: { weekend: WeekendAvailability }) {
@@ -30,19 +30,32 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
     );
   }
 
+  const parts: string[] = [];
+  if (weekend.busyDetails.length > 0) {
+    parts.push(
+      `${weekend.busyDetails
+        .map((d) => (d.titles.length > 0 ? `${d.name} (${d.titles.join(", ")})` : d.name))
+        .join(" & ")} busy`,
+    );
+  }
+  if (weekend.unknownNames.length > 0) {
+    parts.push(
+      `${weekend.unknownNames.join(" & ")} ${weekend.unknownNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`,
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-surface-border bg-surface p-4 opacity-60">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-border/50 text-muted">
-        <X className="h-4 w-4" />
+        {weekend.busyDetails.length === 0 && weekend.unknownNames.length > 0 ? (
+          <HelpCircle className="h-4 w-4" />
+        ) : (
+          <X className="h-4 w-4" />
+        )}
       </span>
       <div>
         <p className="font-medium">{dateLabel}</p>
-        <p className="text-sm text-muted">
-          {weekend.busyDetails
-            .map((d) => (d.titles.length > 0 ? `${d.name} (${d.titles.join(", ")})` : d.name))
-            .join(" & ")}{" "}
-          busy
-        </p>
+        <p className="text-sm text-muted">{parts.join(" · ")}</p>
       </div>
     </div>
   );

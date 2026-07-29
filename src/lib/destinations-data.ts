@@ -6,25 +6,26 @@ export type DestinationLike = {
   cityName: string;
 };
 
-// Roughly-midpoint cities between MSP and LHR, shown as suggestions and as a
-// fallback when the database isn't connected yet.
-export const SAMPLE_DESTINATIONS: DestinationLike[] = [
+// Curated quick-add suggestions on the Destinations page -- roughly midpoint
+// cities between MSP and LHR. This is a real feature (a starting point to
+// add from), not a stand-in for your saved destinations.
+export const SUGGESTED_DESTINATIONS: DestinationLike[] = [
   { id: "sample-kef", iataCode: "KEF", cityName: "Reykjavík" },
   { id: "sample-bos", iataCode: "BOS", cityName: "Boston" },
   { id: "sample-lis", iataCode: "LIS", cityName: "Lisbon" },
   { id: "sample-nyc", iataCode: "NYC", cityName: "New York" },
 ];
 
-export async function getDestinationsOrSample(): Promise<{
+export async function getDestinations(): Promise<{
   destinations: DestinationLike[];
-  isSample: boolean;
+  error: boolean;
 }> {
   try {
     const destinations = await prisma.destination.findMany({
       orderBy: { createdAt: "asc" },
     });
-    return { destinations, isSample: false };
+    return { destinations, error: false };
   } catch {
-    return { destinations: SAMPLE_DESTINATIONS, isSample: true };
+    return { destinations: [], error: true };
   }
 }

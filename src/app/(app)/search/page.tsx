@@ -10,9 +10,8 @@ import {
   getWeekendBySaturdayIso,
   type WeekendAvailability,
 } from "@/lib/availability";
-import { getDestinationsOrSample } from "@/lib/destinations-data";
+import { getDestinations } from "@/lib/destinations-data";
 import { isFlightSearchConfigured, searchCheapestFare } from "@/lib/flights";
-import { mockFare } from "@/lib/mock-fares";
 import { FIONA, JAKE } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
@@ -25,27 +24,29 @@ async function getFare(
   weekend: WeekendAvailability | null,
 ): Promise<LegFare> {
   if (originIataCode === destinationIataCode) return HOME;
+  if (!weekend) return { price: null };
 
-  if (weekend) {
-    const quote = await searchCheapestFare({
-      originIataCode,
-      destinationIataCode,
-      departDate: weekend.saturday,
-      returnDate: weekend.sunday,
-    });
-    if (quote) {
-      return {
-        price: quote.price,
-        durationMinutes: quote.durationMinutes,
-        departureTime: quote.departureTime,
-        arrivalTime: quote.arrivalTime,
-        airline: quote.airline,
-        bookUrl: quote.bookUrl,
-      };
-    }
-  }
+  const quote = await searchCheapestFare({
+    originIataCode,
+    destinationIataCode,
+    departDate: weekend.saturday,
+    returnDate: weekend.sunday,
+  });
+  if (!quote) return { price: null };
 
-  return { price: mockFare(originIataCode, destinationIataCode) };
+  return {
+    price: quote.price,
+    durationMinutes: quote.durationMinutes,
+    departureTime: quote.departureTime,
+    arrivalTime: quote.arrivalTime,
+    airline: quote.airline,
+    bookUrl: quote.bookUrl,
+  };
+}
+
+function total(a: LegFare, b: LegFare): number | null {
+  if (a.price == null || b.price == null) return null;
+  return a.price + b.price;
 }
 
 export default async function SearchPage({
@@ -62,7 +63,7 @@ export default async function SearchPage({
     upcomingFreeWeekends[0] ??
     null;
 
-  const { destinations, isSample: isSampleDestinations } = await getDestinationsOrSample();
+  const { destinations, error: destinationsError } = await getDestinations();
 
   const [fionaToJake, jakeToFiona, ...meetFares] = await Promise.all([
     getFare(FIONA.airport.iataCode, JAKE.airport.iataCode, weekend),
@@ -73,7 +74,7 @@ export default async function SearchPage({
     ]),
   ]);
 
-  const usedRealFares = [fionaToJake, jakeToFiona, ...meetFares].some((f) => f.bookUrl);
+  const anyRealFares = [fionaToJake, jakeToFiona, ...meetFares].some((f) => f.bookUrl);
 
   const visitJake: TripOption = {
     key: "visit-jake",
@@ -82,7 +83,7 @@ export default async function SearchPage({
     iataCode: JAKE.airport.iataCode,
     fiona: fionaToJake,
     jake: HOME,
-    total: fionaToJake.price,
+    total: total(fionaToJake, HOME),
   };
 
   const visitFiona: TripOption = {
@@ -92,7 +93,7 @@ export default async function SearchPage({
     iataCode: FIONA.airport.iataCode,
     fiona: HOME,
     jake: jakeToFiona,
-    total: jakeToFiona.price,
+    total: total(HOME, jakeToFiona),
   };
 
   const meetOptions: TripOption[] = destinations.map((d, i) => {
@@ -105,11 +106,19 @@ export default async function SearchPage({
       iataCode: d.iataCode,
       fiona,
       jake,
-      total: fiona.price + jake.price,
+      total: total(fiona, jake),
     };
   });
 
-  const options = [visitJake, visitFiona, ...meetOptions].sort((a, b) => a.total - b.total);
+  // Options with a real total sort cheapest-first; anything missing a fare
+  // (so we can't honestly compare it) sinks to the bottom, order preserved.
+  const options = [visitJake, visitFiona, ...meetOptions].sort((a, b) => {
+    if (a.total == null && b.total == null) return 0;
+    if (a.total == null) return 1;
+    if (b.total == null) return -1;
+    return a.total - b.total;
+  });
+  const bestIndex = options.findIndex((o) => o.total != null);
 
   return (
     <div className="flex flex-col gap-8">
@@ -159,22 +168,22 @@ export default async function SearchPage({
         </p>
       )}
 
-      {isSampleDestinations && (
+      {destinationsError && (
         <p className="rounded-2xl border border-surface-border bg-surface p-3 text-xs text-muted">
-          Showing sample destinations — connect a database to add your own.
+          Couldn&apos;t reach the database, so saved destinations aren&apos;t showing right now.
         </p>
       )}
-      {!usedRealFares && (
+      {weekend && !anyRealFares && (
         <p className="rounded-2xl border border-surface-border bg-surface p-3 text-xs text-muted">
           {isFlightSearchConfigured()
-            ? "No nonstop flights found for this weekend — showing placeholder prices instead."
-            : "Showing placeholder fares — set SERPAPI_API_KEY to see real nonstop prices."}
+            ? "No nonstop flights found for this weekend."
+            : "No live fares — set SERPAPI_API_KEY to search real nonstop prices."}
         </p>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {options.map((option, i) => (
-          <DestinationFareCard key={option.key} option={option} best={i === 0} />
+          <DestinationFareCard key={option.key} option={option} best={i === bestIndex} />
         ))}
       </div>
     </div>

@@ -3,7 +3,8 @@ import { formatDuration } from "@/lib/flights";
 import { FIONA, JAKE } from "@/lib/people";
 
 export type LegFare = {
-  price: number;
+  /** null = no live fare found for this leg (not a fake placeholder number). */
+  price: number | null;
   durationMinutes?: number;
   departureTime?: string;
   arrivalTime?: string;
@@ -18,7 +19,8 @@ export type TripOption = {
   iataCode: string;
   fiona: LegFare;
   jake: LegFare;
-  total: number;
+  /** null when either leg has no live fare -- can't be trusted for sorting/"best value". */
+  total: number | null;
 };
 
 /** SerpApi returns times as "2026-08-01 08:15" -- show just the clock part. */
@@ -61,7 +63,9 @@ export default function DestinationFareCard({
 
       <div className="mt-4 flex items-center justify-between border-t border-surface-border pt-3 text-sm">
         <span className="text-muted">Combined total</span>
-        <span className="font-semibold">${option.total.toFixed(2)}</span>
+        <span className="font-semibold">
+          {option.total == null ? "—" : `$${option.total.toFixed(2)}`}
+        </span>
       </div>
     </div>
   );
@@ -75,10 +79,10 @@ function FareCell({ label, fare }: { label: string; fare: LegFare }) {
     <div className="rounded-xl bg-background px-3 py-2">
       <p className="text-xs text-muted">{label}</p>
       <p className="text-lg font-semibold">
-        {fare.price === 0 ? "Home" : `$${fare.price.toFixed(2)}`}
+        {fare.price === 0 ? "Home" : fare.price == null ? "No fare found" : `$${fare.price.toFixed(2)}`}
       </p>
 
-      {fare.price > 0 && (
+      {fare.price != null && fare.price > 0 && (
         <>
           {fare.durationMinutes != null && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted">
@@ -93,7 +97,7 @@ function FareCell({ label, fare }: { label: string; fare: LegFare }) {
           )}
           {fare.airline && <p className="text-xs text-muted">{fare.airline}</p>}
 
-          {fare.bookUrl ? (
+          {fare.bookUrl && (
             <a
               href={fare.bookUrl}
               target="_blank"
@@ -103,8 +107,6 @@ function FareCell({ label, fare }: { label: string; fare: LegFare }) {
               Book flight
               <ExternalLink className="h-3 w-3" />
             </a>
-          ) : (
-            <p className="mt-1 text-xs text-muted">Estimate</p>
           )}
         </>
       )}
