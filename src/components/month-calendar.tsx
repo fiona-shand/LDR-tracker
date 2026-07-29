@@ -12,6 +12,7 @@ import { PEOPLE } from "@/lib/people";
 import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MAX_VISIBLE_LINES = 3;
 
 /** Saturday of the Fri-Sun trip window this day belongs to, or null if it's not part of one. */
 function saturdayForTripWindow(day: Date): Date | null {
@@ -20,6 +21,20 @@ function saturdayForTripWindow(day: Date): Date | null {
   if (dow === 6) return day; // Saturday
   if (dow === 0) return addDays(day, -1); // Sunday
   return null;
+}
+
+/** "Fiona: Dentist" / "Jake: Client call" -- but a shared trip title (already names both) is shown as-is. */
+function eventLines(
+  dayEvents: { name: string; titles: string[] }[],
+): string[] {
+  const lines: string[] = [];
+  for (const { name, titles } of dayEvents) {
+    for (const title of titles) {
+      const mentionsEveryone = PEOPLE.every((p) => title.toLowerCase().includes(p.name.toLowerCase()));
+      lines.push(mentionsEveryone ? title : `${name}: ${title}`);
+    }
+  }
+  return Array.from(new Set(lines));
 }
 
 export default function MonthCalendar({
@@ -107,22 +122,33 @@ export default function MonthCalendar({
             name: p.name,
             titles: getBusyTitles(snapshot, p.id, day),
           })).filter((e) => e.titles.length > 0);
+          const lines = eventLines(dayEvents);
+          const visibleLines = lines.slice(0, MAX_VISIBLE_LINES);
+          const extraCount = lines.length - visibleLines.length;
+
           const tooltip =
-            status === "unknown"
+            status === "unknown" && lines.length === 0
               ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
-              : dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
+              : lines.join(" · ") || undefined;
 
           const base =
-            "relative flex h-12 sm:h-16 items-center justify-center rounded-xl text-sm sm:text-base transition-all duration-150";
+            "relative flex min-h-[5.5rem] sm:min-h-28 flex-col gap-0.5 rounded-xl p-1.5 text-left transition-all duration-150";
+          const dayNumberBase = "flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium";
 
           if (together) {
             return (
               <div
                 key={day.toISOString()}
                 title={tooltip}
-                className={`${base} bg-gradient-to-br from-together to-together-2 font-semibold text-white shadow-sm ${isPast ? "opacity-50" : ""}`}
+                className={`${base} bg-gradient-to-br from-together to-together-2 text-white shadow-sm ${isPast ? "opacity-60" : ""}`}
               >
-                {format(day, "d")}
+                <span className={dayNumberBase}>{format(day, "d")}</span>
+                {visibleLines.map((line) => (
+                  <span key={line} className="truncate text-[10px] leading-tight sm:text-xs">
+                    {line}
+                  </span>
+                ))}
+                {extraCount > 0 && <span className="text-[10px] opacity-80">+{extraCount} more</span>}
               </div>
             );
           }
@@ -138,24 +164,28 @@ export default function MonthCalendar({
                     ? "Free Friday–Sunday — suggested, it's been a while since your last trip"
                     : "Free Friday–Sunday — plan a trip"
                 }
-                className={`${base} bg-gradient-to-br from-available to-available-2 font-semibold text-white shadow-sm hover:scale-105 hover:opacity-90 hover:shadow-md active:scale-95 ${suggested ? "ring-2 ring-offset-2 ring-offset-surface ring-amber-400" : ""}`}
+                className={`${base} bg-gradient-to-br from-available to-available-2 text-white shadow-sm hover:scale-[1.02] hover:opacity-90 hover:shadow-md active:scale-[0.99] ${suggested ? "ring-2 ring-offset-2 ring-offset-surface ring-amber-400" : ""}`}
               >
-                {format(day, "d")}
+                <span className={dayNumberBase}>{format(day, "d")}</span>
                 {suggested && (
-                  <Star className="absolute right-1 top-1 h-3 w-3 fill-amber-300 text-amber-300" />
+                  <>
+                    <Star className="absolute right-1.5 top-1.5 h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+                    <span className="text-[10px] font-medium sm:text-xs">Suggested</span>
+                  </>
                 )}
+                {!suggested && <span className="text-[10px] opacity-90 sm:text-xs">Free — plan a trip</span>}
               </Link>
             );
           }
 
           const statusClasses = isPast
-            ? "text-muted/30"
+            ? "text-muted/40"
             : status === "unknown"
-              ? "text-muted/40 border border-dashed border-surface-border"
+              ? "text-muted/60 border border-dashed border-surface-border"
               : status === "both-busy"
-                ? "text-muted/50 line-through"
+                ? "bg-surface-border/30 text-muted"
                 : status === "one-busy"
-                  ? "bg-surface-border/40 text-muted"
+                  ? "bg-surface-border/40 text-foreground"
                   : "text-foreground";
 
           return (
@@ -164,10 +194,20 @@ export default function MonthCalendar({
               title={tooltip}
               className={`${base} ${statusClasses} ${isTodayCell ? "ring-1 ring-accent" : ""}`}
             >
-              {format(day, "d")}
-              {dayEvents.length > 0 && !isPast && (
-                <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-accent" />
-              )}
+              <span className={`${dayNumberBase} ${isTodayCell ? "bg-accent text-white" : ""}`}>
+                {format(day, "d")}
+              </span>
+              {visibleLines.map((line) => (
+                <span
+                  key={line}
+                  className={`truncate rounded px-1 text-[10px] leading-tight sm:text-xs ${
+                    isPast ? "" : "bg-accent-soft text-accent"
+                  }`}
+                >
+                  {line}
+                </span>
+              ))}
+              {extraCount > 0 && <span className="text-[10px] text-muted">+{extraCount} more</span>}
             </div>
           );
         })}
@@ -180,7 +220,7 @@ export default function MonthCalendar({
           label="Suggested"
         />
         <LegendSwatch className="bg-gradient-to-br from-together to-together-2" label="Together" />
-        <LegendSwatch className="bg-surface-border/60" label="One of you busy" />
+        <LegendSwatch className="bg-surface-border/60" label="One or both busy" />
         <LegendSwatch className="border border-dashed border-surface-border" label="Not connected" />
       </div>
     </div>

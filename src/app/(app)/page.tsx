@@ -1,4 +1,5 @@
 import { addMonths, format, startOfMonth, subMonths } from "date-fns";
+import CollapsibleSection from "@/components/collapsible-section";
 import LastSeenBanner from "@/components/last-seen-banner";
 import MonthCalendar from "@/components/month-calendar";
 import PlannedTripsSection from "@/components/planned-trips-section";
@@ -61,20 +62,21 @@ export default async function CalendarPage({
         todayHref={isThisMonth ? undefined : "/"}
       />
 
-      <PlannedTripsSection trips={plannedTrips} />
+      <CollapsibleSection title="Trips together">
+        <PlannedTripsSection trips={plannedTrips} />
+      </CollapsibleSection>
 
-      <section>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight">
-          Upcoming weekends
-        </h2>
+      <CollapsibleSection title="Upcoming weekends">
         <div className="grid gap-3 sm:grid-cols-2">
           {weekends.map((weekend) => (
             <WeekendCard key={weekend.saturday.toISOString()} weekend={weekend} />
           ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
-      <PtoHolidaysSection suggestions={ptoSuggestions} ptoBalance={ptoBalance} />
+      <CollapsibleSection title="Long weekends & holidays">
+        <PtoHolidaysSection suggestions={ptoSuggestions} ptoBalance={ptoBalance} />
+      </CollapsibleSection>
     </div>
   );
 }

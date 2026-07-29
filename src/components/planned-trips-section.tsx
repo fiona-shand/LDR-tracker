@@ -5,9 +5,7 @@ import type { PlannedTripRow } from "@/lib/planned-trips";
 
 export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[] }) {
   return (
-    <section>
-      <h2 className="mb-4 text-xl font-semibold tracking-tight">Trips together</h2>
-
+    <>
       {trips.length > 0 && (
         <ul className="mb-4 grid gap-2 sm:grid-cols-2">
           {trips.map((trip) => (
@@ -86,6 +84,6 @@ export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[]
           Add trip
         </button>
       </form>
-    </section>
+    </>
   );
 }

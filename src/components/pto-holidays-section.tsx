@@ -23,31 +23,28 @@ export default function PtoHolidaysSection({
   const flagged = withBudgetFlags(suggestions, ptoBalance);
 
   return (
-    <section>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">Long weekends & holidays</h2>
-        <form action={setFionaPtoBalance} className="flex items-center gap-2 text-sm">
-          <label htmlFor="pto-days" className="text-muted">
-            {FIONA.name}&apos;s PTO remaining
-          </label>
-          <input
-            id="pto-days"
-            type="number"
-            name="days"
-            min={0}
-            step={0.5}
-            defaultValue={ptoBalance ?? ""}
-            placeholder="—"
-            className="w-16 rounded-lg border border-surface-border bg-transparent px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
-          />
-          <button
-            type="submit"
-            className="rounded-lg border border-surface-border px-2 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-accent"
-          >
-            Save
-          </button>
-        </form>
-      </div>
+    <>
+      <form action={setFionaPtoBalance} className="mb-4 flex items-center gap-2 text-sm">
+        <label htmlFor="pto-days" className="text-muted">
+          {FIONA.name}&apos;s PTO remaining
+        </label>
+        <input
+          id="pto-days"
+          type="number"
+          name="days"
+          min={0}
+          step={0.5}
+          defaultValue={ptoBalance ?? ""}
+          placeholder="—"
+          className="w-16 rounded-lg border border-surface-border bg-transparent px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <button
+          type="submit"
+          className="rounded-lg border border-surface-border px-2 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-accent"
+        >
+          Save
+        </button>
+      </form>
 
       {suggestions.length === 0 ? (
         <p className="rounded-2xl border border-surface-border bg-surface p-4 text-sm text-muted">
@@ -89,6 +86,6 @@ export default function PtoHolidaysSection({
           })}
         </div>
       )}
-    </section>
+    </>
   );
 }
