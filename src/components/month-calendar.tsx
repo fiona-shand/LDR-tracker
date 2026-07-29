@@ -4,15 +4,17 @@ import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import {
   getBusyTitles,
   getDayStatus,
+  getTogetherIntervals,
   getWeekendBySaturdayIso,
   isTogetherDay,
   type AvailabilitySnapshot,
+  type DateInterval,
 } from "@/lib/availability";
 import { PEOPLE } from "@/lib/people";
 import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MAX_VISIBLE_LINES = 3;
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const CIRCLE = "flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm sm:text-base font-medium transition-transform duration-150";
 
 /** Saturday of the Fri-Sun trip window this day belongs to, or null if it's not part of one. */
 function saturdayForTripWindow(day: Date): Date | null {
@@ -23,18 +25,36 @@ function saturdayForTripWindow(day: Date): Date | null {
   return null;
 }
 
-/** "Fiona: Dentist" / "Jake: Client call" -- but a shared trip title (already names both) is shown as-is. */
-function eventLines(
-  dayEvents: { name: string; titles: string[] }[],
-): string[] {
-  const lines: string[] = [];
-  for (const { name, titles } of dayEvents) {
-    for (const title of titles) {
-      const mentionsEveryone = PEOPLE.every((p) => title.toLowerCase().includes(p.name.toLowerCase()));
-      lines.push(mentionsEveryone ? title : `${name}: ${title}`);
-    }
+function buildWeeks(days: Date[], leadingBlanks: number): (Date | null)[][] {
+  const cells: (Date | null)[] = [...Array(leadingBlanks).fill(null), ...days];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+type BarSegment = { key: string; colStart: number; colEnd: number; roundLeft: boolean; roundRight: boolean };
+
+/** Together-trip bar segments touching this week row, clipped to its 7 columns. */
+function barsForRow(week: (Date | null)[], intervals: DateInterval[]): BarSegment[] {
+  const segments: BarSegment[] = [];
+  for (const interval of intervals) {
+    const cols = week.reduce<number[]>((acc, d, i) => {
+      if (d && d.getTime() >= interval.start.getTime() && d.getTime() <= interval.end.getTime()) acc.push(i);
+      return acc;
+    }, []);
+    if (cols.length === 0) continue;
+    const colStart = Math.min(...cols);
+    const colEnd = Math.max(...cols);
+    segments.push({
+      key: `${interval.start.getTime()}-${colStart}`,
+      colStart,
+      colEnd,
+      roundLeft: week[colStart]!.getTime() === interval.start.getTime(),
+      roundRight: week[colEnd]!.getTime() === interval.end.getTime(),
+    });
   }
-  return Array.from(new Set(lines));
+  return segments;
 }
 
 export default function MonthCalendar({
@@ -52,12 +72,104 @@ export default function MonthCalendar({
 }) {
   const start = startOfMonth(month);
   const end = endOfMonth(month);
-  const leadingBlanks = start.getDay();
   const days = eachDayOfInterval({ start, end });
   const today = startOfDay(new Date());
-  const unconnectedNames = PEOPLE.filter((p) => snapshot.sources[p.id] !== "real").map(
-    (p) => p.name,
-  );
+  const weeks = buildWeeks(days, start.getDay());
+
+  const unconnectedNames = PEOPLE.filter((p) => snapshot.sources[p.id] !== "real").map((p) => p.name);
+  const togetherIntervals = getTogetherIntervals(snapshot);
+  const togetherEndpoints = new Set<number>();
+  for (const iv of togetherIntervals) {
+    togetherEndpoints.add(iv.start.getTime());
+    togetherEndpoints.add(iv.end.getTime());
+  }
+
+  function renderDay(day: Date) {
+    const isPast = day < today;
+    const status = getDayStatus(snapshot, day);
+    const isTodayCell = isToday(day);
+    const together = isTogetherDay(snapshot, day);
+    const isEndpoint = togetherEndpoints.has(day.getTime());
+
+    const tripSaturday = saturdayForTripWindow(day);
+    const tripWeekend = tripSaturday
+      ? getWeekendBySaturdayIso(snapshot, format(tripSaturday, "yyyy-MM-dd"))
+      : null;
+    const tripFree = !isPast && !together && !!tripWeekend?.bothFree;
+    const suggested = tripFree && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
+
+    const dayEvents = PEOPLE.map((p) => ({ name: p.name, titles: getBusyTitles(snapshot, p.id, day) })).filter(
+      (e) => e.titles.length > 0,
+    );
+    const tooltip =
+      status === "unknown" && dayEvents.length === 0
+        ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
+        : dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
+
+    const todayRing = isTodayCell ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : "";
+
+    if (together) {
+      if (!isEndpoint) {
+        return (
+          <div
+            key={day.toISOString()}
+            title={tooltip}
+            className={`flex items-center justify-center py-1 text-sm font-medium text-foreground sm:text-base ${isPast ? "opacity-60" : ""}`}
+          >
+            {format(day, "d")}
+          </div>
+        );
+      }
+      return (
+        <div key={day.toISOString()} title={tooltip} className={`flex items-center justify-center py-1 ${isPast ? "opacity-60" : ""}`}>
+          <span className={`${CIRCLE} bg-day-together font-semibold text-day-together-ink ${todayRing}`}>
+            {format(day, "d")}
+          </span>
+        </div>
+      );
+    }
+
+    if (tripFree) {
+      const saturdayIso = format(tripSaturday!, "yyyy-MM-dd");
+      return (
+        <Link
+          key={day.toISOString()}
+          href={`/search?weekend=${saturdayIso}`}
+          title={
+            suggested
+              ? "Free Friday–Sunday — suggested, it's been a while since your last trip"
+              : "Free Friday–Sunday — plan a trip"
+          }
+          className="flex items-center justify-center py-1"
+        >
+          <span
+            className={`${CIRCLE} relative bg-day-free text-day-free-ink hover:scale-105 active:scale-95 ${todayRing} ${
+              suggested ? "ring-2 ring-day-suggested-ink" : ""
+            }`}
+          >
+            {format(day, "d")}
+            {suggested && (
+              <Star className="absolute -right-1 -top-1 h-3.5 w-3.5 fill-day-suggested-ink text-day-suggested-ink" />
+            )}
+          </span>
+        </Link>
+      );
+    }
+
+    const fillClasses = isPast
+      ? "text-muted/40"
+      : status === "unknown"
+        ? "border border-dashed border-surface-border text-muted/70"
+        : status === "both-busy" || status === "one-busy"
+          ? "bg-day-busy text-day-busy-ink"
+          : "text-foreground";
+
+    return (
+      <div key={day.toISOString()} title={tooltip} className="flex items-center justify-center py-1">
+        <span className={`${CIRCLE} ${fillClasses} ${todayRing}`}>{format(day, "d")}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm sm:p-6">
@@ -94,133 +206,44 @@ export default function MonthCalendar({
       </div>
 
       <div className="grid grid-cols-7 gap-y-1 text-center text-xs text-muted">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="py-1">
-            {label.slice(0, 3)}
+        {WEEKDAY_LABELS.map((label, i) => (
+          <div key={i} className="py-1">
+            {label}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1.5">
-        {Array.from({ length: leadingBlanks }).map((_, i) => (
-          <div key={`blank-${i}`} />
-        ))}
-        {days.map((day) => {
-          const isPast = day < today;
-          const status = getDayStatus(snapshot, day);
-          const isTodayCell = isToday(day);
 
-          const together = isTogetherDay(snapshot, day);
-
-          const tripSaturday = saturdayForTripWindow(day);
-          const tripWeekend = tripSaturday
-            ? getWeekendBySaturdayIso(snapshot, format(tripSaturday, "yyyy-MM-dd"))
-            : null;
-          const tripFree = !isPast && !together && !!tripWeekend?.bothFree;
-          const suggested = tripFree && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
-
-          const dayEvents = PEOPLE.map((p) => ({
-            name: p.name,
-            titles: getBusyTitles(snapshot, p.id, day),
-          })).filter((e) => e.titles.length > 0);
-          const lines = eventLines(dayEvents);
-          const visibleLines = lines.slice(0, MAX_VISIBLE_LINES);
-          const extraCount = lines.length - visibleLines.length;
-
-          const tooltip =
-            status === "unknown" && lines.length === 0
-              ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
-              : lines.join(" · ") || undefined;
-
-          const base =
-            "relative flex min-h-[5.5rem] sm:min-h-28 flex-col gap-0.5 rounded-xl p-1.5 text-left transition-all duration-150";
-          const dayNumberBase = "flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium";
-
-          if (together) {
-            return (
-              <div
-                key={day.toISOString()}
-                title={tooltip}
-                className={`${base} bg-gradient-to-br from-together to-together-2 text-white shadow-sm ${isPast ? "opacity-60" : ""}`}
-              >
-                <span className={dayNumberBase}>{format(day, "d")}</span>
-                {visibleLines.map((line) => (
-                  <span key={line} className="truncate text-[10px] leading-tight sm:text-xs">
-                    {line}
-                  </span>
-                ))}
-                {extraCount > 0 && <span className="text-[10px] opacity-80">+{extraCount} more</span>}
-              </div>
-            );
-          }
-
-          if (tripFree) {
-            const saturdayIso = format(tripSaturday!, "yyyy-MM-dd");
-            return (
-              <Link
-                key={day.toISOString()}
-                href={`/search?weekend=${saturdayIso}`}
-                title={
-                  suggested
-                    ? "Free Friday–Sunday — suggested, it's been a while since your last trip"
-                    : "Free Friday–Sunday — plan a trip"
-                }
-                className={`${base} bg-gradient-to-br from-available to-available-2 text-white shadow-sm hover:scale-[1.02] hover:opacity-90 hover:shadow-md active:scale-[0.99] ${suggested ? "ring-2 ring-offset-2 ring-offset-surface ring-amber-400" : ""}`}
-              >
-                <span className={dayNumberBase}>{format(day, "d")}</span>
-                {suggested && (
-                  <>
-                    <Star className="absolute right-1.5 top-1.5 h-3.5 w-3.5 fill-amber-300 text-amber-300" />
-                    <span className="text-[10px] font-medium sm:text-xs">Suggested</span>
-                  </>
-                )}
-                {!suggested && <span className="text-[10px] opacity-90 sm:text-xs">Free — plan a trip</span>}
-              </Link>
-            );
-          }
-
-          const statusClasses = isPast
-            ? "text-muted/40"
-            : status === "unknown"
-              ? "text-muted/60 border border-dashed border-surface-border"
-              : status === "both-busy"
-                ? "bg-surface-border/30 text-muted"
-                : status === "one-busy"
-                  ? "bg-surface-border/40 text-foreground"
-                  : "text-foreground";
-
+      <div className="flex flex-col gap-1">
+        {weeks.map((week, weekIndex) => {
+          const bars = barsForRow(week, togetherIntervals);
           return (
-            <div
-              key={day.toISOString()}
-              title={tooltip}
-              className={`${base} ${statusClasses} ${isTodayCell ? "ring-1 ring-accent" : ""}`}
-            >
-              <span className={`${dayNumberBase} ${isTodayCell ? "bg-accent text-white" : ""}`}>
-                {format(day, "d")}
-              </span>
-              {visibleLines.map((line) => (
-                <span
-                  key={line}
-                  className={`truncate rounded px-1 text-[10px] leading-tight sm:text-xs ${
-                    isPast ? "" : "bg-accent-soft text-accent"
-                  }`}
-                >
-                  {line}
-                </span>
-              ))}
-              {extraCount > 0 && <span className="text-[10px] text-muted">+{extraCount} more</span>}
+            <div key={weekIndex} className="relative">
+              {bars.length > 0 && (
+                <div className="pointer-events-none absolute inset-0 grid grid-cols-7 items-center">
+                  {bars.map((seg) => (
+                    <div
+                      key={seg.key}
+                      style={{ gridColumnStart: seg.colStart + 1, gridColumnEnd: seg.colEnd + 2 }}
+                      className={`h-9 bg-day-together-bar sm:h-11 ${seg.roundLeft ? "rounded-l-full" : ""} ${
+                        seg.roundRight ? "rounded-r-full" : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="relative grid grid-cols-7">
+                {week.map((day, i) => (day ? renderDay(day) : <div key={`blank-${weekIndex}-${i}`} />))}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-surface-border pt-3 text-xs text-muted">
-        <LegendSwatch className="bg-gradient-to-br from-available to-available-2" label="Free Fri–Sun" />
-        <LegendSwatch
-          className="bg-gradient-to-br from-available to-available-2 ring-2 ring-amber-400"
-          label="Suggested"
-        />
-        <LegendSwatch className="bg-gradient-to-br from-together to-together-2" label="Together" />
-        <LegendSwatch className="bg-surface-border/60" label="One or both busy" />
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-surface-border pt-3 text-xs text-muted">
+        <LegendSwatch className="bg-day-free" label="Free Fri–Sun" />
+        <LegendSwatch className="bg-day-free ring-2 ring-day-suggested-ink" label="Suggested" />
+        <LegendSwatch className="bg-day-together" label="Together" />
+        <LegendSwatch className="bg-day-busy" label="One or both busy" />
         <LegendSwatch className="border border-dashed border-surface-border" label="Not connected" />
       </div>
     </div>
@@ -230,7 +253,7 @@ export default function MonthCalendar({
 function LegendSwatch({ className, label }: { className: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`h-3 w-3 rounded ${className}`} />
+      <span className={`h-3.5 w-3.5 rounded-full ${className}`} />
       {label}
     </span>
   );

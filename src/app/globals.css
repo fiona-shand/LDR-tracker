@@ -9,13 +9,19 @@
   --accent: #2563eb;
   --accent-2: #06b6d4;
   --accent-soft: #eff6ff;
-  --available: #16a34a;
-  --available-2: #22c55e;
   --series-fiona: #2a78d6;
   --series-jake: #eb6834;
   --chart-grid: #e1e0d9;
-  --together: #4a3aa7;
-  --together-2: #6d5cd4;
+  /* Calendar day-marker palette (flat pastel circles, not gradients) */
+  --day-free: #f6cede;
+  --day-free-ink: #9c3f61;
+  --day-suggested: #c9ecda;
+  --day-suggested-ink: #1f7a52;
+  --day-busy: #faf1cf;
+  --day-busy-ink: #8a6d1f;
+  --day-together: #1a1a1a;
+  --day-together-ink: #ffffff;
+  --day-together-bar: #dcdcdc;
 }
 
 @theme inline {
@@ -27,13 +33,18 @@
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
   --color-accent-soft: var(--accent-soft);
-  --color-available: var(--available);
-  --color-available-2: var(--available-2);
   --color-series-fiona: var(--series-fiona);
   --color-series-jake: var(--series-jake);
   --color-chart-grid: var(--chart-grid);
-  --color-together: var(--together);
-  --color-together-2: var(--together-2);
+  --color-day-free: var(--day-free);
+  --color-day-free-ink: var(--day-free-ink);
+  --color-day-suggested: var(--day-suggested);
+  --color-day-suggested-ink: var(--day-suggested-ink);
+  --color-day-busy: var(--day-busy);
+  --color-day-busy-ink: var(--day-busy-ink);
+  --color-day-together: var(--day-together);
+  --color-day-together-ink: var(--day-together-ink);
+  --color-day-together-bar: var(--day-together-bar);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -48,13 +59,18 @@
     --accent: #38bdf8;
     --accent-2: #22d3ee;
     --accent-soft: #0c2a3d;
-    --available: #16a34a;
-    --available-2: #22c55e;
     --series-fiona: #3987e5;
     --series-jake: #d95926;
     --chart-grid: #2c2c2a;
-    --together: #7c6ae0;
-    --together-2: #a78bfa;
+    --day-free: #4a2536;
+    --day-free-ink: #f3b8cd;
+    --day-suggested: #143829;
+    --day-suggested-ink: #7fdcb2;
+    --day-busy: #3a3218;
+    --day-busy-ink: #e8cf7a;
+    --day-together: #f1f5f9;
+    --day-together-ink: #0f172a;
+    --day-together-bar: #3a3a3a;
   }
 }
 

@@ -1,29 +1,8 @@
 import { differenceInCalendarDays, startOfDay } from "date-fns";
-import type { AvailabilitySnapshot, WeekendAvailability } from "@/lib/availability";
+import { getTogetherIntervals, type AvailabilitySnapshot, type WeekendAvailability } from "@/lib/availability";
 
 /** Flag a free weekend as worth booking once a gap since the last trip together passes this. */
 const GAP_THRESHOLD_WEEKS = 6;
-
-type Interval = { start: Date; end: Date };
-
-/** Merge togetherDates (individual days) into contiguous trip blocks. */
-function mergedTogetherIntervals(snapshot: AvailabilitySnapshot): Interval[] {
-  const isoDates = Array.from(snapshot.togetherDates).sort();
-  const intervals: Interval[] = [];
-
-  for (const iso of isoDates) {
-    const [year, month, day] = iso.split("-").map(Number);
-    const date = new Date(year, month - 1, day);
-    const last = intervals[intervals.length - 1];
-    if (last && differenceInCalendarDays(date, last.end) <= 1) {
-      last.end = date;
-    } else {
-      intervals.push({ start: date, end: date });
-    }
-  }
-
-  return intervals;
-}
 
 /**
  * Whether a free Friday-Sunday weekend is worth highlighting as a suggestion:
@@ -39,7 +18,7 @@ export function isSuggestedWeekend(
   if (!weekend.bothFree) return false;
 
   const today = startOfDay(new Date());
-  const intervals = mergedTogetherIntervals(snapshot);
+  const intervals = getTogetherIntervals(snapshot);
   const priorEnd =
     intervals
       .filter((iv) => iv.end < weekend.friday)

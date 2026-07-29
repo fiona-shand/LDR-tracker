@@ -90,6 +90,27 @@ export function isTogetherDay(snapshot: AvailabilitySnapshot, date: Date): boole
   return snapshot.togetherDates.has(format(date, "yyyy-MM-dd"));
 }
 
+export type DateInterval = { start: Date; end: Date };
+
+/** Merge togetherDates (individual days) into contiguous trip ranges. */
+export function getTogetherIntervals(snapshot: AvailabilitySnapshot): DateInterval[] {
+  const isoDates = Array.from(snapshot.togetherDates).sort();
+  const intervals: DateInterval[] = [];
+
+  for (const iso of isoDates) {
+    const [year, month, day] = iso.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    const last = intervals[intervals.length - 1];
+    if (last && (date.getTime() - last.end.getTime()) / 86400000 <= 1) {
+      last.end = date;
+    } else {
+      intervals.push({ start: date, end: date });
+    }
+  }
+
+  return intervals;
+}
+
 /** Event titles (e.g. "Concert", "Trip to Rome") that make this person busy on this day. */
 export function getBusyTitles(
   snapshot: AvailabilitySnapshot,
