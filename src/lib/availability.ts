@@ -1,6 +1,7 @@
 import { addDays, format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { PEOPLE } from "@/lib/people";
+import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
 
 type PersonId = (typeof PEOPLE)[number]["id"];
 
@@ -13,12 +14,16 @@ export type AvailabilitySnapshot = {
    * can still mark specific days busy for an "unconnected" person -- it just
    * doesn't tell us anything about the rest of their calendar. */
   sources: Record<PersonId, "real" | "unconnected">;
+  /** Dates from the "Planned trips" connection specifically -- a reliable
+   * "we're together" signal regardless of how the trip was titled. */
+  togetherDates: Set<string>;
 };
 
 async function getPersonData(personId: PersonId): Promise<{
   dates: Set<string>;
   events: Record<string, string[]>;
   source: "real" | "unconnected";
+  togetherDates: Set<string>;
 }> {
   try {
     const today = startOfDay(new Date());
@@ -30,28 +35,36 @@ async function getPersonData(personId: PersonId): Promise<{
       }),
       prisma.busyBlock.findMany({
         where: { personId, startsAt: { lte: horizonEnd }, endsAt: { gte: today } },
-        select: { startsAt: true, endsAt: true, title: true },
+        select: {
+          startsAt: true,
+          endsAt: true,
+          title: true,
+          calendarConnection: { select: { label: true } },
+        },
       }),
     ]);
 
     const dates = new Set<string>();
     const events: Record<string, string[]> = {};
+    const togetherDates = new Set<string>();
     for (const block of blocks) {
       const title = block.title?.trim() || "Busy";
+      const isPlannedTogether = block.calendarConnection.label === PLANNED_TRIPS_LABEL;
       let cursor = startOfDay(block.startsAt);
       const end = startOfDay(block.endsAt);
       while (cursor <= end) {
         const iso = format(cursor, "yyyy-MM-dd");
         dates.add(iso);
+        if (isPlannedTogether) togetherDates.add(iso);
         const forDay = (events[iso] ??= []);
         if (!forDay.includes(title)) forDay.push(title);
         cursor = addDays(cursor, 1);
       }
     }
 
-    return { dates, events, source: realConnection ? "real" : "unconnected" };
+    return { dates, events, source: realConnection ? "real" : "unconnected", togetherDates };
   } catch {
-    return { dates: new Set(), events: {}, source: "unconnected" };
+    return { dates: new Set(), events: {}, source: "unconnected", togetherDates: new Set() };
   }
 }
 
@@ -59,15 +72,22 @@ export async function getAvailabilitySnapshot(): Promise<AvailabilitySnapshot> {
   const busyDates = {} as Record<PersonId, Set<string>>;
   const busyEvents = {} as Record<PersonId, Record<string, string[]>>;
   const sources = {} as Record<PersonId, "real" | "unconnected">;
+  const togetherDates = new Set<string>();
 
   for (const person of PEOPLE) {
     const data = await getPersonData(person.id);
     busyDates[person.id] = data.dates;
     busyEvents[person.id] = data.events;
     sources[person.id] = data.source;
+    for (const iso of data.togetherDates) togetherDates.add(iso);
   }
 
-  return { busyDates, busyEvents, sources };
+  return { busyDates, busyEvents, sources, togetherDates };
+}
+
+/** Whether this day is part of a recorded "we're together" trip. */
+export function isTogetherDay(snapshot: AvailabilitySnapshot, date: Date): boolean {
+  return snapshot.togetherDates.has(format(date, "yyyy-MM-dd"));
 }
 
 /** Event titles (e.g. "Concert", "Trip to Rome") that make this person busy on this day. */

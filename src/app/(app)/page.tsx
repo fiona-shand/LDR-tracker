@@ -1,12 +1,13 @@
 import { addMonths, format, startOfMonth, subMonths } from "date-fns";
 import LastSeenBanner from "@/components/last-seen-banner";
 import MonthCalendar from "@/components/month-calendar";
+import PlannedTripsSection from "@/components/planned-trips-section";
 import PtoHolidaysSection from "@/components/pto-holidays-section";
 import WeekendCard from "@/components/weekend-card";
 import { getFionaPtoBalance } from "@/lib/actions/pto";
 import { ensureAutoSyncedCalendars } from "@/lib/auto-sync";
 import { getAvailabilitySnapshot, getUpcomingWeekends } from "@/lib/availability";
-import { ensurePlannedTripsSeeded } from "@/lib/planned-trips";
+import { listPlannedTrips } from "@/lib/planned-trips";
 import { PEOPLE } from "@/lib/people";
 import { upcomingPtoSuggestions } from "@/lib/pto-suggestions";
 import { getLastSeenInfo } from "@/lib/visits";
@@ -29,7 +30,6 @@ export default async function CalendarPage({
   const { month: monthParam } = await searchParams;
 
   await ensureAutoSyncedCalendars();
-  await ensurePlannedTripsSeeded();
   const snapshot = await getAvailabilitySnapshot();
 
   const currentMonth = parseMonthParam(monthParam);
@@ -39,6 +39,7 @@ export default async function CalendarPage({
   const lastSeenInfo = getLastSeenInfo(snapshot);
   const ptoBalance = await getFionaPtoBalance();
   const ptoSuggestions = upcomingPtoSuggestions(snapshot);
+  const plannedTrips = await listPlannedTrips();
 
   return (
     <div className="flex flex-col gap-10">
@@ -59,6 +60,8 @@ export default async function CalendarPage({
         nextHref={`/?month=${format(addMonths(currentMonth, 1), "yyyy-MM")}`}
         todayHref={isThisMonth ? undefined : "/"}
       />
+
+      <PlannedTripsSection trips={plannedTrips} />
 
       <section>
         <h2 className="mb-4 text-xl font-semibold tracking-tight">

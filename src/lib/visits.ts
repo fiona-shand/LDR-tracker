@@ -26,9 +26,14 @@ function looksLikeVisit(title: string, otherPerson: Person): boolean {
   );
 }
 
-/** Calendar dates (either person's calendar) that look like a visit together, deduped and sorted. */
+/**
+ * Calendar dates that look like a visit together, deduped and sorted.
+ * Combines two signals: a manually-recorded planned trip (reliable,
+ * regardless of title) and a text match on a synced calendar event's title
+ * (best-effort, for things like an actual flight confirmation).
+ */
 export function detectVisitDates(snapshot: AvailabilitySnapshot): Date[] {
-  const isoDates = new Set<string>();
+  const isoDates = new Set<string>(snapshot.togetherDates);
 
   for (const person of PEOPLE) {
     const other = PEOPLE.find((p) => p.id !== person.id)!;

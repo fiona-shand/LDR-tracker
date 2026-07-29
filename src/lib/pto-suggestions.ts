@@ -1,7 +1,7 @@
 import { addDays, format, startOfDay } from "date-fns";
 import type { AvailabilitySnapshot } from "@/lib/availability";
 import { FIONA } from "@/lib/people";
-import { usFederalHolidays } from "@/lib/us-holidays";
+import { optumHolidays, type Holiday } from "@/lib/us-holidays";
 
 export type PtoSuggestion = {
   holidayName: string;
@@ -11,28 +11,62 @@ export type PtoSuggestion = {
   ptoDaysNeeded: number;
 };
 
-/**
- * How many PTO days (and which window) turns a US holiday into a long
- * weekend, by bridging it to the nearest Saturday/Sunday. Only Fiona's PTO
- * is tracked -- Jake has unlimited time off, so he's never the constraint.
- */
-function bridgeWindow(holiday: Date): { start: Date; end: Date; ptoDaysNeeded: number } {
-  const dow = holiday.getDay(); // 0 Sun ... 6 Sat
+const MAX_BRIDGE_PTO_PER_SIDE = 2;
 
-  if (dow === 6) return { start: holiday, end: addDays(holiday, 2), ptoDaysNeeded: 0 }; // Sat
-  if (dow === 0) return { start: addDays(holiday, -1), end: holiday, ptoDaysNeeded: 0 }; // Sun
-  if (dow === 5) return { start: holiday, end: addDays(holiday, 2), ptoDaysNeeded: 0 }; // Fri -> Fri-Sun free already
-  if (dow === 1) return { start: addDays(holiday, -3), end: holiday, ptoDaysNeeded: 1 }; // Mon -> take Fri off
-  if (dow === 4) return { start: holiday, end: addDays(holiday, 3), ptoDaysNeeded: 1 }; // Thu -> take Fri off
-  if (dow === 2) return { start: addDays(holiday, -3), end: holiday, ptoDaysNeeded: 1 }; // Tue -> take Mon off
-  return { start: addDays(holiday, -4), end: holiday, ptoDaysNeeded: 2 }; // Wed -> take Mon+Tue off
+function isFreeDay(date: Date, holidaySet: Set<string>): boolean {
+  const dow = date.getDay();
+  return dow === 0 || dow === 6 || holidaySet.has(format(date, "yyyy-MM-dd"));
+}
+
+/** Walk outward through consecutive free (weekend/holiday) days, at no PTO cost. */
+function extendFreeRun(edge: Date, direction: 1 | -1, holidaySet: Set<string>): Date {
+  let cursor = edge;
+  while (isFreeDay(addDays(cursor, direction), holidaySet)) cursor = addDays(cursor, direction);
+  return cursor;
 }
 
 /**
- * Upcoming US holidays worth planning a long-haul trip around, with the PTO
- * cost to extend each into a long weekend. Skips any holiday whose window
- * overlaps a day Fiona is already known to be busy (including an
- * already-planned trip), since that time is already accounted for.
+ * From the edge of an already-free run, try spending up to
+ * MAX_BRIDGE_PTO_PER_SIDE PTO days on the workdays immediately beyond it to
+ * reach the *next* free day -- then ride that free run for free. If it can't
+ * be reached within budget, don't bridge at all (0 PTO, edge unchanged).
+ */
+function extendEdge(edge: Date, direction: 1 | -1, holidaySet: Set<string>): { edge: Date; pto: number } {
+  let probe = addDays(edge, direction);
+  let bridgeCost = 0;
+  while (!isFreeDay(probe, holidaySet) && bridgeCost < MAX_BRIDGE_PTO_PER_SIDE) {
+    bridgeCost++;
+    probe = addDays(probe, direction);
+  }
+
+  if (!isFreeDay(probe, holidaySet)) return { edge, pto: 0 };
+
+  return { edge: extendFreeRun(probe, direction, holidaySet), pto: bridgeCost };
+}
+
+/** Merge holidays that fall on consecutive calendar days into one block (e.g. Thanksgiving + the day after). */
+function mergeAdjacentHolidays(holidays: Holiday[]): { name: string; start: Date; end: Date }[] {
+  const sorted = [...holidays].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const blocks: { name: string; start: Date; end: Date }[] = [];
+
+  for (const h of sorted) {
+    const last = blocks[blocks.length - 1];
+    if (last && format(addDays(last.end, 1), "yyyy-MM-dd") === format(h.date, "yyyy-MM-dd")) {
+      last.end = h.date;
+      last.name = `${last.name} + ${h.name}`;
+    } else {
+      blocks.push({ name: h.name, start: h.date, end: h.date });
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Upcoming holidays (Fiona's actual company-observed list) worth planning a
+ * long-haul trip around, with the PTO cost to extend each into a long
+ * weekend. Skips any window that overlaps a day Fiona is already known to be
+ * busy (including an already-planned trip), since that time is accounted for.
  */
 export function upcomingPtoSuggestions(
   snapshot: AvailabilitySnapshot,
@@ -41,18 +75,26 @@ export function upcomingPtoSuggestions(
   const today = startOfDay(new Date());
   const horizon = addDays(today, monthsAhead * 31);
   const years = [today.getFullYear(), today.getFullYear() + 1];
-  const holidays = years.flatMap((y) => usFederalHolidays(y));
+  const holidays = years.flatMap((y) => optumHolidays(y));
+  const holidaySet = new Set(holidays.map((h) => format(h.date, "yyyy-MM-dd")));
 
-  return holidays
-    .filter((h) => h.date >= today && h.date <= horizon)
-    .map((h) => {
-      const w = bridgeWindow(h.date);
+  const blocks = mergeAdjacentHolidays(holidays).filter(
+    (b) => b.end >= today && b.start <= horizon,
+  );
+
+  return blocks
+    .map((block) => {
+      const freeStart = extendFreeRun(block.start, -1, holidaySet);
+      const freeEnd = extendFreeRun(block.end, 1, holidaySet);
+      const before = extendEdge(freeStart, -1, holidaySet);
+      const after = extendEdge(freeEnd, 1, holidaySet);
+
       return {
-        holidayName: h.name,
-        holidayDate: h.date,
-        windowStart: w.start,
-        windowEnd: w.end,
-        ptoDaysNeeded: w.ptoDaysNeeded,
+        holidayName: block.name,
+        holidayDate: block.start,
+        windowStart: before.edge,
+        windowEnd: after.edge,
+        ptoDaysNeeded: before.pto + after.pto,
       };
     })
     .filter((s) => {

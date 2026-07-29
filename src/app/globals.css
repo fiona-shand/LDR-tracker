@@ -14,6 +14,8 @@
   --series-fiona: #2a78d6;
   --series-jake: #eb6834;
   --chart-grid: #e1e0d9;
+  --together: #db2777;
+  --together-2: #ec4899;
 }
 
 @theme inline {
@@ -30,6 +32,8 @@
   --color-series-fiona: var(--series-fiona);
   --color-series-jake: var(--series-jake);
   --color-chart-grid: var(--chart-grid);
+  --color-together: var(--together);
+  --color-together-2: var(--together-2);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -49,6 +53,8 @@
     --series-fiona: #3987e5;
     --series-jake: #d95926;
     --chart-grid: #2c2c2a;
+    --together: #ec4899;
+    --together-2: #f472b6;
   }
 }
 

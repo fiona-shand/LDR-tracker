@@ -1,13 +1,15 @@
 import { addDays, eachDayOfInterval, endOfMonth, format, isToday, startOfDay, startOfMonth } from "date-fns";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import {
   getBusyTitles,
   getDayStatus,
   getWeekendBySaturdayIso,
+  isTogetherDay,
   type AvailabilitySnapshot,
 } from "@/lib/availability";
 import { PEOPLE } from "@/lib/people";
+import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -92,11 +94,14 @@ export default function MonthCalendar({
           const status = getDayStatus(snapshot, day);
           const isTodayCell = isToday(day);
 
+          const together = isTogetherDay(snapshot, day);
+
           const tripSaturday = saturdayForTripWindow(day);
           const tripWeekend = tripSaturday
             ? getWeekendBySaturdayIso(snapshot, format(tripSaturday, "yyyy-MM-dd"))
             : null;
-          const tripFree = !isPast && !!tripWeekend?.bothFree;
+          const tripFree = !isPast && !together && !!tripWeekend?.bothFree;
+          const suggested = tripFree && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
 
           const dayEvents = PEOPLE.map((p) => ({
             name: p.name,
@@ -110,16 +115,35 @@ export default function MonthCalendar({
           const base =
             "relative flex h-12 sm:h-16 items-center justify-center rounded-xl text-sm sm:text-base transition-all duration-150";
 
+          if (together) {
+            return (
+              <div
+                key={day.toISOString()}
+                title={tooltip}
+                className={`${base} bg-gradient-to-br from-together to-together-2 font-semibold text-white shadow-sm ${isPast ? "opacity-50" : ""}`}
+              >
+                {format(day, "d")}
+              </div>
+            );
+          }
+
           if (tripFree) {
             const saturdayIso = format(tripSaturday!, "yyyy-MM-dd");
             return (
               <Link
                 key={day.toISOString()}
                 href={`/search?weekend=${saturdayIso}`}
-                title="Free Friday–Sunday — plan a trip"
-                className={`${base} bg-gradient-to-br from-available to-available-2 font-semibold text-white shadow-sm hover:scale-105 hover:opacity-90 hover:shadow-md active:scale-95`}
+                title={
+                  suggested
+                    ? "Free Friday–Sunday — suggested, it's been a while since your last trip"
+                    : "Free Friday–Sunday — plan a trip"
+                }
+                className={`${base} bg-gradient-to-br from-available to-available-2 font-semibold text-white shadow-sm hover:scale-105 hover:opacity-90 hover:shadow-md active:scale-95 ${suggested ? "ring-2 ring-offset-2 ring-offset-surface ring-amber-400" : ""}`}
               >
                 {format(day, "d")}
+                {suggested && (
+                  <Star className="absolute right-1 top-1 h-3 w-3 fill-amber-300 text-amber-300" />
+                )}
               </Link>
             );
           }
@@ -148,6 +172,26 @@ export default function MonthCalendar({
           );
         })}
       </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-surface-border pt-3 text-xs text-muted">
+        <LegendSwatch className="bg-gradient-to-br from-available to-available-2" label="Free Fri–Sun" />
+        <LegendSwatch
+          className="bg-gradient-to-br from-available to-available-2 ring-2 ring-amber-400"
+          label="Suggested"
+        />
+        <LegendSwatch className="bg-gradient-to-br from-together to-together-2" label="Together" />
+        <LegendSwatch className="bg-surface-border/60" label="One of you busy" />
+        <LegendSwatch className="border border-dashed border-surface-border" label="Not connected" />
+      </div>
     </div>
+  );
+}
+
+function LegendSwatch({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`h-3 w-3 rounded ${className}`} />
+      {label}
+    </span>
   );
 }

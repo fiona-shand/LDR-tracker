@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { PEOPLE } from "@/lib/people";
+import { FIONA, PEOPLE } from "@/lib/people";
 
 type PlannedTrip = {
   id: string;
@@ -47,13 +47,39 @@ export const PLANNED_TRIPS: PlannedTrip[] = [
 
 export const PLANNED_TRIPS_LABEL = "Planned trips";
 
+export type PlannedTripRow = {
+  externalEventId: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+};
+
+/** Every recorded trip together, hardcoded seed and manually-added alike. */
+export async function listPlannedTrips(): Promise<PlannedTripRow[]> {
+  try {
+    const connection = await prisma.calendarConnection.findFirst({
+      where: { personId: FIONA.id, provider: "ICS", label: PLANNED_TRIPS_LABEL },
+    });
+    if (!connection) return [];
+
+    const blocks = await prisma.busyBlock.findMany({
+      where: { calendarConnectionId: connection.id },
+      orderBy: { startsAt: "asc" },
+      select: { externalEventId: true, title: true, startsAt: true, endsAt: true },
+    });
+    return blocks.map((b) => ({ ...b, title: b.title ?? "Trip together" }));
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Makes sure the known/confirmed upcoming visits are recorded as busy time
- * for both people, so the calendar and weekend suggestions treat those dates
- * as already spoken for instead of suggesting new trips over them. Manually
- * declared (not calendar-synced), and safe to re-run -- upserts by a stable
- * id so editing PLANNED_TRIPS above updates existing rows instead of
- * duplicating them.
+ * One-time bootstrap for the known/confirmed upcoming visits, told directly
+ * rather than pulled from a calendar sync. Not called automatically anymore
+ * now that trips can be added/removed from the Calendar page -- re-run by
+ * hand only if you need to restore these from scratch. Safe to re-run:
+ * upserts by a stable id, so it won't duplicate or fight manual edits to
+ * other trips.
  */
 export async function ensurePlannedTripsSeeded() {
   for (const person of PEOPLE) {
