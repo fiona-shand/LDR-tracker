@@ -7,6 +7,7 @@ import {
   saveBusyBlocks,
   toFetchableIcsUrl,
 } from "@/lib/ics-sync";
+import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
 
 const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 
@@ -32,7 +33,7 @@ export async function ensureAutoSyncedCalendars() {
     }
 
     let connection = await prisma.calendarConnection.findFirst({
-      where: { personId: person.id, provider: "ICS" },
+      where: { personId: person.id, provider: "ICS", label: { not: PLANNED_TRIPS_LABEL } },
     });
 
     const stale =

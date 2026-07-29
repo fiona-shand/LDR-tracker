@@ -5,7 +5,7 @@ import type { WeekendAvailability } from "@/lib/availability";
 
 export default function WeekendCard({ weekend }: { weekend: WeekendAvailability }) {
   const saturdayIso = format(weekend.saturday, "yyyy-MM-dd");
-  const dateLabel = `${format(weekend.saturday, "EEE, MMM d")} – ${format(weekend.sunday, "EEE, MMM d")}`;
+  const dateLabel = `${format(weekend.friday, "EEE, MMM d")} – ${format(weekend.sunday, "EEE, MMM d")}`;
 
   if (weekend.bothFree) {
     return (
@@ -14,7 +14,7 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
         className="group flex items-center justify-between rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99]"
       >
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-white">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-available to-available-2 text-white">
             <CalendarCheck2 className="h-4 w-4" />
           </span>
           <div>

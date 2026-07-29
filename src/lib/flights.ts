@@ -8,6 +8,12 @@ const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const NONSTOP_ONLY = "1";
 const MAX_FLIGHT_MINUTES = 15 * 60;
 
+// A "weekend trip" leaves Friday afternoon and comes back sometime Sunday
+// midday through night -- bias the search toward those departure/arrival
+// windows instead of red-eyes or early-morning flights.
+const OUTBOUND_TIME_RANGE = "12,21"; // Friday: depart between noon and 9pm
+const RETURN_TIME_RANGE = "11,23"; // Sunday: depart between 11am and 11pm
+
 export type FareQuote = {
   price: number;
   currency: string;
@@ -154,6 +160,8 @@ export async function searchCheapestFare(params: {
   url.searchParams.set("type", "1"); // round trip
   url.searchParams.set("stops", NONSTOP_ONLY);
   url.searchParams.set("max_duration", String(MAX_FLIGHT_MINUTES));
+  url.searchParams.set("outbound_times", OUTBOUND_TIME_RANGE);
+  url.searchParams.set("return_times", RETURN_TIME_RANGE);
   url.searchParams.set("currency", "USD");
   url.searchParams.set("hl", "en");
   url.searchParams.set("api_key", apiKey);

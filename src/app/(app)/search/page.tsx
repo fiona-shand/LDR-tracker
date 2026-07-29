@@ -29,7 +29,7 @@ async function getFare(
   const quote = await searchCheapestFare({
     originIataCode,
     destinationIataCode,
-    departDate: weekend.saturday,
+    departDate: weekend.friday,
     returnDate: weekend.sunday,
   });
   if (!quote) return { price: null };
@@ -134,7 +134,7 @@ export default async function SearchPage({
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-surface-border bg-surface p-4 shadow-sm">
           <span className="text-sm text-muted">Weekend of</span>
           <span className="font-semibold">
-            {format(weekend.saturday, "EEE, MMM d")} – {format(weekend.sunday, "EEE, MMM d")}
+            {format(weekend.friday, "EEE, MMM d")} – {format(weekend.sunday, "EEE, MMM d")}
           </span>
           {upcomingFreeWeekends.length > 1 && (
             <div className="ml-auto flex flex-wrap gap-2">
