@@ -1,27 +1,9 @@
 import { Clock, ExternalLink, Sparkles } from "lucide-react";
 import { formatDuration } from "@/lib/flights";
 import { FIONA, JAKE } from "@/lib/people";
+import type { LegFare, TripOption } from "@/lib/trip-options";
 
-export type LegFare = {
-  /** null = no live fare found for this leg (not a fake placeholder number). */
-  price: number | null;
-  durationMinutes?: number;
-  departureTime?: string;
-  arrivalTime?: string;
-  airline?: string;
-  bookUrl?: string;
-};
-
-export type TripOption = {
-  key: string;
-  title: string;
-  subtitle: string;
-  iataCode: string;
-  fiona: LegFare;
-  jake: LegFare;
-  /** null when either leg has no live fare -- can't be trusted for sorting/"best value". */
-  total: number | null;
-};
+export type { LegFare, TripOption };
 
 /** SerpApi returns times as "2026-08-01 08:15" -- show just the clock part. */
 function clockTime(value?: string): string | undefined {

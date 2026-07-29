@@ -1,53 +1,16 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import DestinationFareCard, {
-  type LegFare,
-  type TripOption,
-} from "@/components/destination-fare-card";
+import DestinationFareCard from "@/components/destination-fare-card";
 import {
   getAvailabilitySnapshot,
   getUpcomingWeekends,
   getWeekendBySaturdayIso,
-  type WeekendAvailability,
 } from "@/lib/availability";
-import { getDestinations } from "@/lib/destinations-data";
-import { isFlightSearchConfigured, searchCheapestFare } from "@/lib/flights";
+import { isFlightSearchConfigured } from "@/lib/flights";
+import { buildTripOptions } from "@/lib/trip-options";
 import { FIONA, JAKE } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
-
-const HOME: LegFare = { price: 0 };
-
-async function getFare(
-  originIataCode: string,
-  destinationIataCode: string,
-  weekend: WeekendAvailability | null,
-): Promise<LegFare> {
-  if (originIataCode === destinationIataCode) return HOME;
-  if (!weekend) return { price: null };
-
-  const quote = await searchCheapestFare({
-    originIataCode,
-    destinationIataCode,
-    departDate: weekend.friday,
-    returnDate: weekend.sunday,
-  });
-  if (!quote) return { price: null };
-
-  return {
-    price: quote.price,
-    durationMinutes: quote.durationMinutes,
-    departureTime: quote.departureTime,
-    arrivalTime: quote.arrivalTime,
-    airline: quote.airline,
-    bookUrl: quote.bookUrl,
-  };
-}
-
-function total(a: LegFare, b: LegFare): number | null {
-  if (a.price == null || b.price == null) return null;
-  return a.price + b.price;
-}
 
 export default async function SearchPage({
   searchParams,
@@ -63,61 +26,7 @@ export default async function SearchPage({
     upcomingFreeWeekends[0] ??
     null;
 
-  const { destinations, error: destinationsError } = await getDestinations();
-
-  const [fionaToJake, jakeToFiona, ...meetFares] = await Promise.all([
-    getFare(FIONA.airport.iataCode, JAKE.airport.iataCode, weekend),
-    getFare(JAKE.airport.iataCode, FIONA.airport.iataCode, weekend),
-    ...destinations.flatMap((d) => [
-      getFare(FIONA.airport.iataCode, d.iataCode, weekend),
-      getFare(JAKE.airport.iataCode, d.iataCode, weekend),
-    ]),
-  ]);
-
-  const anyRealFares = [fionaToJake, jakeToFiona, ...meetFares].some((f) => f.bookUrl);
-
-  const visitJake: TripOption = {
-    key: "visit-jake",
-    title: `Visit ${JAKE.name}`,
-    subtitle: JAKE.airport.city,
-    iataCode: JAKE.airport.iataCode,
-    fiona: fionaToJake,
-    jake: HOME,
-    total: total(fionaToJake, HOME),
-  };
-
-  const visitFiona: TripOption = {
-    key: "visit-fiona",
-    title: `Visit ${FIONA.name}`,
-    subtitle: FIONA.airport.city,
-    iataCode: FIONA.airport.iataCode,
-    fiona: HOME,
-    jake: jakeToFiona,
-    total: total(HOME, jakeToFiona),
-  };
-
-  const meetOptions: TripOption[] = destinations.map((d, i) => {
-    const fiona = meetFares[i * 2];
-    const jake = meetFares[i * 2 + 1];
-    return {
-      key: d.id,
-      title: `Meet in ${d.cityName}`,
-      subtitle: "Halfway-ish",
-      iataCode: d.iataCode,
-      fiona,
-      jake,
-      total: total(fiona, jake),
-    };
-  });
-
-  // Options with a real total sort cheapest-first; anything missing a fare
-  // (so we can't honestly compare it) sinks to the bottom, order preserved.
-  const options = [visitJake, visitFiona, ...meetOptions].sort((a, b) => {
-    if (a.total == null && b.total == null) return 0;
-    if (a.total == null) return 1;
-    if (b.total == null) return -1;
-    return a.total - b.total;
-  });
+  const { options, anyRealFares, destinationsError } = await buildTripOptions(weekend);
   const bestIndex = options.findIndex((o) => o.total != null);
 
   return (
@@ -186,6 +95,13 @@ export default async function SearchPage({
           <DestinationFareCard key={option.key} option={option} best={i === bestIndex} />
         ))}
       </div>
+
+      <Link
+        href="/compare"
+        className="text-sm font-medium text-accent underline underline-offset-2"
+      >
+        Compare cost & flight time across destinations →
+      </Link>
     </div>
   );
 }

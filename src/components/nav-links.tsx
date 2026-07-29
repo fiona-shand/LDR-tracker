@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/", label: "Calendar" },
   { href: "/destinations", label: "Destinations" },
   { href: "/search", label: "Plan a trip" },
+  { href: "/compare", label: "Compare" },
 ];
 
 export default function NavLinks() {
