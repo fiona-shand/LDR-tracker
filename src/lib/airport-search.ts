@@ -51,3 +51,8 @@ export function searchAirports(query: string, limit = 8): AirportResult[] {
 
   return [...metroMatches, ...airportMatches].slice(0, limit);
 }
+
+/** ISO 3166-1 alpha-2 country code for an airport, e.g. "PT" for LIS. */
+export function getCountryForIata(iataCode: string): string | undefined {
+  return AIRPORTS_BY_CODE.get(iataCode)?.country;
+}

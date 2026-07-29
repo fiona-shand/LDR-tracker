@@ -6,6 +6,7 @@ import {
   getUpcomingWeekends,
   getWeekendBySaturdayIso,
 } from "@/lib/availability";
+import { getDestinationImage } from "@/lib/destination-image";
 import { isFlightSearchConfigured } from "@/lib/flights";
 import { buildTripOptions } from "@/lib/trip-options";
 import { FIONA, JAKE } from "@/lib/people";
@@ -28,6 +29,7 @@ export default async function SearchPage({
 
   const { options, anyRealFares, destinationsError } = await buildTripOptions(weekend);
   const bestIndex = options.findIndex((o) => o.total != null);
+  const imageUrls = await Promise.all(options.map((o) => getDestinationImage(o.cityName)));
 
   return (
     <div className="flex flex-col gap-8">
@@ -92,7 +94,12 @@ export default async function SearchPage({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {options.map((option, i) => (
-          <DestinationFareCard key={option.key} option={option} best={i === bestIndex} />
+          <DestinationFareCard
+            key={option.key}
+            option={option}
+            best={i === bestIndex}
+            imageUrl={imageUrls[i]}
+          />
         ))}
       </div>
 

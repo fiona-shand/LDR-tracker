@@ -18,6 +18,8 @@ export type TripOption = {
   title: string;
   subtitle: string;
   iataCode: string;
+  /** Plain city name for image/cost lookups -- "London", not "London Heathrow". */
+  cityName: string;
   fiona: LegFare;
   jake: LegFare;
   /** null when either leg has no live fare -- can't be trusted for sorting/"best value". */
@@ -27,6 +29,10 @@ export type TripOption = {
 };
 
 const HOME: LegFare = { price: 0 };
+
+function primaryCityWord(city: string): string {
+  return city.split(/[\s–-]+/)[0] ?? city;
+}
 
 async function getFare(
   originIataCode: string,
@@ -82,6 +88,7 @@ export async function buildTripOptions(weekend: WeekendAvailability | null): Pro
     title: `Visit ${JAKE.name}`,
     subtitle: JAKE.airport.city,
     iataCode: JAKE.airport.iataCode,
+    cityName: primaryCityWord(JAKE.airport.city),
     fiona: fionaToJake,
     jake: HOME,
     total: total(fionaToJake, HOME),
@@ -93,6 +100,7 @@ export async function buildTripOptions(weekend: WeekendAvailability | null): Pro
     title: `Visit ${FIONA.name}`,
     subtitle: FIONA.airport.city,
     iataCode: FIONA.airport.iataCode,
+    cityName: primaryCityWord(FIONA.airport.city),
     fiona: HOME,
     jake: jakeToFiona,
     total: total(HOME, jakeToFiona),
@@ -107,6 +115,7 @@ export async function buildTripOptions(weekend: WeekendAvailability | null): Pro
       title: `Meet in ${d.cityName}`,
       subtitle: "Halfway-ish",
       iataCode: d.iataCode,
+      cityName: d.cityName,
       fiona,
       jake,
       total: total(fiona, jake),
