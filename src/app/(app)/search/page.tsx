@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import DestinationFareCard, { type TripOption } from "@/components/destination-fare-card";
+import DestinationFareCard, {
+  type LegFare,
+  type TripOption,
+} from "@/components/destination-fare-card";
 import {
   getAvailabilitySnapshot,
   getUpcomingWeekends,
@@ -8,20 +11,20 @@ import {
   type WeekendAvailability,
 } from "@/lib/availability";
 import { getDestinationsOrSample } from "@/lib/destinations-data";
-import { flightBookingUrl, isFlightSearchConfigured, searchCheapestFare } from "@/lib/flights";
+import { isFlightSearchConfigured, searchCheapestFare } from "@/lib/flights";
 import { mockFare } from "@/lib/mock-fares";
 import { FIONA, JAKE } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
-type Fare = { price: number; bookUrl?: string };
+const HOME: LegFare = { price: 0 };
 
 async function getFare(
   originIataCode: string,
   destinationIataCode: string,
   weekend: WeekendAvailability | null,
-): Promise<Fare> {
-  if (originIataCode === destinationIataCode) return { price: 0 };
+): Promise<LegFare> {
+  if (originIataCode === destinationIataCode) return HOME;
 
   if (weekend) {
     const quote = await searchCheapestFare({
@@ -32,13 +35,12 @@ async function getFare(
     });
     if (quote) {
       return {
-        price: quote.priceCents / 100,
-        bookUrl: flightBookingUrl({
-          originIataCode,
-          destinationIataCode,
-          departDate: weekend.saturday,
-          returnDate: weekend.sunday,
-        }),
+        price: quote.price,
+        durationMinutes: quote.durationMinutes,
+        departureTime: quote.departureTime,
+        arrivalTime: quote.arrivalTime,
+        airline: quote.airline,
+        bookUrl: quote.bookUrl,
       };
     }
   }
@@ -62,7 +64,7 @@ export default async function SearchPage({
 
   const { destinations, isSample: isSampleDestinations } = await getDestinationsOrSample();
 
-  const [jakeVisitFare, fionaVisitFare, ...meetFares] = await Promise.all([
+  const [fionaToJake, jakeToFiona, ...meetFares] = await Promise.all([
     getFare(FIONA.airport.iataCode, JAKE.airport.iataCode, weekend),
     getFare(JAKE.airport.iataCode, FIONA.airport.iataCode, weekend),
     ...destinations.flatMap((d) => [
@@ -71,17 +73,16 @@ export default async function SearchPage({
     ]),
   ]);
 
-  const usedRealFares = [jakeVisitFare, fionaVisitFare, ...meetFares].some((f) => f.bookUrl);
+  const usedRealFares = [fionaToJake, jakeToFiona, ...meetFares].some((f) => f.bookUrl);
 
   const visitJake: TripOption = {
     key: "visit-jake",
     title: `Visit ${JAKE.name}`,
     subtitle: JAKE.airport.city,
     iataCode: JAKE.airport.iataCode,
-    fareFiona: jakeVisitFare.price,
-    fareJake: 0,
-    total: jakeVisitFare.price,
-    bookUrlFiona: jakeVisitFare.bookUrl,
+    fiona: fionaToJake,
+    jake: HOME,
+    total: fionaToJake.price,
   };
 
   const visitFiona: TripOption = {
@@ -89,25 +90,22 @@ export default async function SearchPage({
     title: `Visit ${FIONA.name}`,
     subtitle: FIONA.airport.city,
     iataCode: FIONA.airport.iataCode,
-    fareFiona: 0,
-    fareJake: fionaVisitFare.price,
-    total: fionaVisitFare.price,
-    bookUrlJake: fionaVisitFare.bookUrl,
+    fiona: HOME,
+    jake: jakeToFiona,
+    total: jakeToFiona.price,
   };
 
   const meetOptions: TripOption[] = destinations.map((d, i) => {
-    const fionaFare = meetFares[i * 2];
-    const jakeFare = meetFares[i * 2 + 1];
+    const fiona = meetFares[i * 2];
+    const jake = meetFares[i * 2 + 1];
     return {
       key: d.id,
       title: `Meet in ${d.cityName}`,
       subtitle: "Halfway-ish",
       iataCode: d.iataCode,
-      fareFiona: fionaFare.price,
-      fareJake: jakeFare.price,
-      total: fionaFare.price + jakeFare.price,
-      bookUrlFiona: fionaFare.bookUrl,
-      bookUrlJake: jakeFare.bookUrl,
+      fiona,
+      jake,
+      total: fiona.price + jake.price,
     };
   });
 
@@ -118,7 +116,7 @@ export default async function SearchPage({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Plan a trip</h1>
         <p className="mt-1 text-sm text-muted">
-          Comparing flights from {FIONA.airport.iataCode} and {JAKE.airport.iataCode}
+          Comparing nonstop flights from {FIONA.airport.iataCode} and {JAKE.airport.iataCode}
           {" "}for a free weekend.
         </p>
       </div>
@@ -169,8 +167,8 @@ export default async function SearchPage({
       {!usedRealFares && (
         <p className="rounded-2xl border border-surface-border bg-surface p-3 text-xs text-muted">
           {isFlightSearchConfigured()
-            ? "Couldn't get live fares for this weekend — showing placeholder prices instead."
-            : "Showing placeholder fares — set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET to see real prices."}
+            ? "No nonstop flights found for this weekend — showing placeholder prices instead."
+            : "Showing placeholder fares — set SERPAPI_API_KEY to see real nonstop prices."}
         </p>
       )}
 

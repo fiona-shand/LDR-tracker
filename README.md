@@ -8,7 +8,7 @@ Finds weekends when two people (Fiona in MSP, Jake in LHR) are both free, and co
 
 - **Calendar** — three-month view highlighting weekends both people are free; syncs automatically from each person's `.ics` calendar link (Apple public calendar, Google secret address), ignoring paydays, free-marked events, short online meetings, and public holidays
 - **Destinations** — shared wishlist of cities, with city/airport typeahead search
-- **Plan a trip** — pick a free weekend, compare real fares side by side, click through to book
+- **Plan a trip** — pick a free weekend, compare real nonstop fares side by side with flight times and durations, click through to book
 
 ## Stack
 
@@ -16,7 +16,8 @@ Finds weekends when two people (Fiona in MSP, Jake in LHR) are both free, and co
 - Postgres (Supabase) via Prisma
 - Calendars synced from `ICS_URL_<PERSONID>` env vars (webcal/ICS feed), parsed with node-ical
 - Bundled OurAirports dataset for destination search
-- Amadeus Self-Service API for real fares (`AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET`), cached a few hours per route; falls back to placeholder fares if unconfigured. Booking links go to a prefilled Google Flights search — Amadeus's self-service tier doesn't issue purchasable links.
+- SerpApi's Google Flights engine for real fares (`SERPAPI_API_KEY`), restricted to nonstop and cached 12h per route+date to stay inside the 250-searches/month free tier; falls back to clearly-labelled placeholder fares if unconfigured. Booking links open a prefilled Google Flights search to complete the purchase.
+  - Amadeus Self-Service was the original provider; that programme was decommissioned on 17 July 2026.
 
 ## Getting started
 

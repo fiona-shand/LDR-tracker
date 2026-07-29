@@ -12,7 +12,6 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
-    "amadeus": "^11.0.0",
     "date-fns": "^4.4.0",
     "framer-motion": "^12.42.2",
     "googleapis": "^173.0.0",
