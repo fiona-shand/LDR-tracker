@@ -1,4 +1,4 @@
-import { addMonths, format, startOfMonth, subMonths } from "date-fns";
+import { addMonths, format, subMonths } from "date-fns";
 import CollapsibleSection from "@/components/collapsible-section";
 import LastSeenBanner from "@/components/last-seen-banner";
 import MonthCalendar from "@/components/month-calendar";
@@ -8,20 +8,13 @@ import WeekendCard from "@/components/weekend-card";
 import { getFionaPtoBalance } from "@/lib/actions/pto";
 import { ensureAutoSyncedCalendars } from "@/lib/auto-sync";
 import { getAvailabilitySnapshot, getUpcomingWeekends } from "@/lib/availability";
+import { formatMonthParam, parseMonthParam } from "@/lib/calendar-month";
 import { listPlannedTrips } from "@/lib/planned-trips";
 import { PEOPLE } from "@/lib/people";
 import { upcomingPtoSuggestions } from "@/lib/pto-suggestions";
 import { getLastSeenInfo } from "@/lib/visits";
 
 export const dynamic = "force-dynamic";
-
-function parseMonthParam(value: string | undefined): Date {
-  if (value) {
-    const [year, month] = value.split("-").map(Number);
-    if (year && month) return new Date(year, month - 1, 1);
-  }
-  return startOfMonth(new Date());
-}
 
 export default async function CalendarPage({
   searchParams,
@@ -57,8 +50,8 @@ export default async function CalendarPage({
       <MonthCalendar
         month={currentMonth}
         snapshot={snapshot}
-        prevHref={`/?month=${format(subMonths(currentMonth, 1), "yyyy-MM")}`}
-        nextHref={`/?month=${format(addMonths(currentMonth, 1), "yyyy-MM")}`}
+        prevHref={`/?month=${formatMonthParam(subMonths(currentMonth, 1))}`}
+        nextHref={`/?month=${formatMonthParam(addMonths(currentMonth, 1))}`}
         todayHref={isThisMonth ? undefined : "/"}
       />
 

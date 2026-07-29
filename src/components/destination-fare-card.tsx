@@ -22,7 +22,7 @@ export default function DestinationFareCard({
   best?: boolean;
   imageUrl?: string | null;
 }) {
-  const costTier = getCostTier(option.iataCode);
+  const costTier = getCostTier(option.iataCode, option.cityName);
   const fionaIsHome = option.fiona.price === 0;
   const jakeIsHome = option.jake.price === 0;
 
