@@ -63,20 +63,19 @@ npm run db:migrate && npm run db:seed && npm run db:demo
 
 Deploys automatically from `main` via Vercel. Environment variables are managed in the Vercel project settings (`vercel env ls`), not from `.env`.
 
-**Vercel does not run migrations.** After merging a schema change, apply it by
-hand with the Supabase **Session pooler** URL (Settings → Database):
+**Migrations run automatically on deploy.** Vercel uses the `vercel-build`
+script, which runs `prisma migrate deploy` before `next build`, so merging a
+schema change to `main` is all that's needed — there's no manual step and no
+way to forget one. A failing migration fails the build, which is the point:
+it stops code shipping against a schema that isn't there.
+
+Data backfills belong in migrations too, for the same reason — see
+`20260731010000_backfill_trip_destinations`, which reads dates from the
+existing rows and only fills in what's missing.
+
+If you ever do need to run one by hand, an inline `DATABASE_URL` takes
+precedence over `.env`, so it's safe from the same checkout you develop in:
 
 ```bash
 DATABASE_URL="<supabase session pooler url>" npx prisma migrate deploy
-```
-
-An inline `DATABASE_URL` takes precedence over `.env`, so this is safe to run
-from the same checkout you develop in.
-
-The trip-planner migration also needs a one-off backfill, which records where
-each existing trip took place so the "whose turn is it" tally has something to
-count:
-
-```bash
-DATABASE_URL="<supabase session pooler url>" npm run db:backfill
 ```
