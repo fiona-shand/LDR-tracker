@@ -53,6 +53,13 @@ export type CatalogCity = {
  * point you can override per-destination.
  */
 export const CATALOG: CatalogCity[] = [
+  // --- Home cities ---
+  // Tagged like anywhere else on purpose. Without these, "Visit Jake" and
+  // "Visit Fiona" score zero on interest match, so picking any interest at all
+  // would quietly penalise visiting each other.
+  { iataCode: "LHR", cityName: "London", interests: ["food", "museums", "history", "nightlife"] },
+  { iataCode: "MSP", cityName: "Minneapolis", interests: ["food", "nature", "museums"] },
+
   // --- Transatlantic meet-in-the-middle favourites ---
   { iataCode: "KEF", cityName: "Reykjavik", interests: ["nature", "cosy"] },
   { iataCode: "DUB", cityName: "Dublin", interests: ["food", "history", "nightlife", "cosy"] },
