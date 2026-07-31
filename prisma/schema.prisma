@@ -42,8 +42,38 @@ model Destination {
   id       String @id @default(cuid())
   iataCode String @unique
   cityName String
+  /// Interest tags (see src/lib/interests.ts) used to rank destinations.
+  interests String[] @default([])
 
   createdAt DateTime @default(now())
+}
+
+/// Metadata for a recorded trip together, keyed by the shared externalEventId
+/// that addPlannedTrip already writes onto both people's BusyBlock rows.
+/// Kept alongside those rows rather than replacing them, so the availability
+/// engine is untouched -- this exists purely to record WHERE a trip was, which
+/// is what makes "whose turn is it to travel" answerable.
+model Trip {
+  id                  String   @id @default(cuid())
+  externalEventId     String   @unique
+  title               String
+  destinationIataCode String
+  startsAt            DateTime
+  endsAt              DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([startsAt])
+}
+
+/// Single-row table holding the couple's shared planning preferences.
+model Preferences {
+  id              String   @id @default("singleton")
+  interests       String[] @default([])
+  cadenceMinWeeks Int      @default(5)
+  cadenceMaxWeeks Int      @default(6)
+
+  updatedAt DateTime @updatedAt
 }
 
 enum CalendarProvider {

@@ -4,6 +4,8 @@ export type DestinationLike = {
   id: string;
   iataCode: string;
   cityName: string;
+  /** Interest tags (see interests.ts). Absent on the curated quick-add list. */
+  interests?: string[];
 };
 
 // Curated quick-add suggestions on the Destinations page -- roughly midpoint

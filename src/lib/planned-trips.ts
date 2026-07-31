@@ -4,6 +4,8 @@ import { FIONA, PEOPLE } from "@/lib/people";
 type PlannedTrip = {
   id: string;
   title: string;
+  /** Where the trip was/is. Drives the "whose turn to travel" ledger. */
+  destinationIataCode: string;
   /** Inclusive start/end dates. */
   startsAt: Date;
   endsAt: Date;
@@ -15,30 +17,35 @@ type PlannedTrip = {
 export const PLANNED_TRIPS: PlannedTrip[] = [
   {
     id: "boston-2026-08",
+    destinationIataCode: "BOS",
     title: "Fiona & Jake in Boston",
     startsAt: new Date(2026, 7, 4),
     endsAt: new Date(2026, 7, 9),
   },
   {
     id: "london-2026-09",
+    destinationIataCode: "LHR",
     title: "Fiona & Jake in London",
     startsAt: new Date(2026, 8, 5),
     endsAt: new Date(2026, 8, 20),
   },
   {
     id: "minneapolis-2026-10",
+    destinationIataCode: "MSP",
     title: "Fiona & Jake in Minneapolis (assumed Oct 26 – Nov 1, \"last week of October\")",
     startsAt: new Date(2026, 9, 26),
     endsAt: new Date(2026, 10, 1),
   },
   {
     id: "london-2026-11-thanksgiving",
+    destinationIataCode: "LHR",
     title: "Fiona & Jake in London — Thanksgiving week (assumed Nov 23–29)",
     startsAt: new Date(2026, 10, 23),
     endsAt: new Date(2026, 10, 29),
   },
   {
     id: "minneapolis-2027-01",
+    destinationIataCode: "MSP",
     title: "Fiona & Jake in Minneapolis",
     startsAt: new Date(2027, 0, 15),
     endsAt: new Date(2027, 1, 8),
@@ -112,5 +119,33 @@ export async function ensurePlannedTripsSeeded() {
         },
       });
     }
+  }
+
+  await backfillSeedTripDestinations();
+}
+
+/**
+ * Record where each seeded trip was, so the fairness ledger can tell who did
+ * the travelling. Idempotent, and safe to run against a database that already
+ * has manually-added trips -- it only touches the seed ids.
+ */
+export async function backfillSeedTripDestinations() {
+  for (const trip of PLANNED_TRIPS) {
+    await prisma.trip.upsert({
+      where: { externalEventId: trip.id },
+      update: {
+        title: trip.title,
+        destinationIataCode: trip.destinationIataCode,
+        startsAt: trip.startsAt,
+        endsAt: trip.endsAt,
+      },
+      create: {
+        externalEventId: trip.id,
+        title: trip.title,
+        destinationIataCode: trip.destinationIataCode,
+        startsAt: trip.startsAt,
+        endsAt: trip.endsAt,
+      },
+    });
   }
 }
