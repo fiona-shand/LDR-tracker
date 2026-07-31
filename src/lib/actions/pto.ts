@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { FIONA } from "@/lib/people";
 
@@ -15,7 +16,7 @@ export async function getFionaPtoBalance(): Promise<number | null> {
 
 export async function setFionaPtoBalance(formData: FormData) {
   const days = Number(formData.get("days"));
-  if (!Number.isFinite(days) || days < 0) return;
+  if (!Number.isFinite(days) || days < 0) redirect("/settings?status=pto-error");
 
   try {
     await prisma.ptoBalance.upsert({
@@ -24,9 +25,10 @@ export async function setFionaPtoBalance(formData: FormData) {
       create: { personId: FIONA.id, currentDays: days },
     });
   } catch {
-    return;
+    redirect("/settings?status=pto-error");
   }
 
   revalidatePath("/");
   revalidatePath("/settings");
+  redirect("/settings?status=pto-saved");
 }

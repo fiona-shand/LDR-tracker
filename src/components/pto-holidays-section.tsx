@@ -3,6 +3,7 @@ import { CalendarRange, TriangleAlert } from "lucide-react";
 import { setFionaPtoBalance } from "@/lib/actions/pto";
 import { FIONA, JAKE } from "@/lib/people";
 import type { PtoSuggestion } from "@/lib/pto-suggestions";
+import SubmitButton from "@/components/submit-button";
 
 function withBudgetFlags(suggestions: PtoSuggestion[], ptoBalance: number | null) {
   let cumulativePto = 0;
@@ -38,12 +39,11 @@ export default function PtoHolidaysSection({
           placeholder="—"
           className="w-16 rounded-lg border border-surface-border bg-transparent px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
-        <button
-          type="submit"
+        <SubmitButton
           className="rounded-lg border border-surface-border px-2 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-accent"
         >
           Save
-        </button>
+        </SubmitButton>
       </form>
 
       {suggestions.length === 0 ? (

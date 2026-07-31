@@ -4,6 +4,7 @@ import { FIONA } from "@/lib/people";
 import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
 
 const HORIZON_DAYS = 200;
+const HISTORY_DAYS = 3650;
 
 export type AvailabilitySnapshot = {
   busyDates: Set<string>;
@@ -22,6 +23,7 @@ async function getFionaData(): Promise<{
 }> {
   try {
     const today = startOfDay(new Date());
+    const historyStart = addDays(today, -HISTORY_DAYS);
     const horizonEnd = addDays(today, HORIZON_DAYS);
 
     const [realConnection, blocks] = await Promise.all([
@@ -29,7 +31,11 @@ async function getFionaData(): Promise<{
         where: { personId: FIONA.id, provider: "ICS", icsUrl: { not: null } },
       }),
       prisma.busyBlock.findMany({
-        where: { personId: FIONA.id, startsAt: { lte: horizonEnd }, endsAt: { gte: today } },
+        where: {
+          personId: FIONA.id,
+          startsAt: { lte: horizonEnd },
+          endsAt: { gte: historyStart },
+        },
         select: {
           startsAt: true,
           endsAt: true,

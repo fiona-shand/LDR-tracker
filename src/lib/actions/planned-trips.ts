@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { FIONA } from "@/lib/people";
 import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
@@ -23,45 +24,52 @@ export async function addPlannedTrip(formData: FormData) {
   const endsAtRaw = formData.get("endsAt");
   const destinationRaw = formData.get("destinationIataCode");
 
-  if (typeof title !== "string" || title.trim() === "") return;
-  if (typeof startsAtRaw !== "string" || typeof endsAtRaw !== "string") return;
+  if (typeof title !== "string" || title.trim() === "") redirect("/settings?status=visit-error");
+  if (typeof startsAtRaw !== "string" || typeof endsAtRaw !== "string") redirect("/settings?status=visit-error");
 
   const startsAt = new Date(`${startsAtRaw}T00:00:00`);
   const endsAt = new Date(`${endsAtRaw}T00:00:00`);
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt < startsAt) return;
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt < startsAt) {
+    redirect("/settings?status=visit-dates-error");
+  }
 
-  if (typeof destinationRaw !== "string" || !/^[A-Za-z]{3}$/.test(destinationRaw.trim())) return;
+  if (typeof destinationRaw !== "string" || !/^[A-Za-z]{3}$/.test(destinationRaw.trim())) {
+    redirect("/settings?status=visit-destination-error");
+  }
   const destinationIataCode = destinationRaw.trim().toUpperCase();
 
   const externalEventId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   try {
     const connection = await getOrCreateConnection(FIONA.id);
-    await prisma.busyBlock.create({
-      data: {
-        personId: FIONA.id,
-        calendarConnectionId: connection.id,
-        externalEventId,
-        title: title.trim(),
-        startsAt,
-        endsAt,
-        isAllDay: true,
-      },
-    });
-    await prisma.trip.create({
-      data: { externalEventId, title: title.trim(), destinationIataCode, startsAt, endsAt },
-    });
+    await prisma.$transaction([
+      prisma.busyBlock.create({
+        data: {
+          personId: FIONA.id,
+          calendarConnectionId: connection.id,
+          externalEventId,
+          title: title.trim(),
+          startsAt,
+          endsAt,
+          isAllDay: true,
+        },
+      }),
+      prisma.trip.create({
+        data: { externalEventId, title: title.trim(), destinationIataCode, startsAt, endsAt },
+      }),
+    ]);
   } catch {
-    return;
+    redirect("/settings?status=visit-error");
   }
 
   revalidatePath("/");
   revalidatePath("/settings");
+  redirect(`/?month=${startsAtRaw.slice(0, 7)}&status=visit-added`);
 }
 
 export async function removePlannedTrip(formData: FormData) {
   const externalEventId = formData.get("externalEventId");
-  if (typeof externalEventId !== "string") return;
+  if (typeof externalEventId !== "string") redirect("/settings?status=visit-error");
 
   try {
     const connections = await prisma.calendarConnection.findMany({
@@ -73,9 +81,10 @@ export async function removePlannedTrip(formData: FormData) {
     });
     await prisma.trip.deleteMany({ where: { externalEventId } });
   } catch {
-    return;
+    redirect("/settings?status=visit-error");
   }
 
   revalidatePath("/");
   revalidatePath("/settings");
+  redirect("/settings?status=visit-removed");
 }

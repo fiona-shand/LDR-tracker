@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { Plus, X } from "lucide-react";
 import { addPlannedTrip, removePlannedTrip } from "@/lib/actions/planned-trips";
 import type { PlannedTripRow } from "@/lib/planned-trips";
+import SubmitButton from "@/components/submit-button";
 
 export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[] }) {
   return (
@@ -92,13 +93,13 @@ export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[]
             className="rounded-lg border border-surface-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
         </div>
-        <button
-          type="submit"
+        <SubmitButton
+          pendingLabel="Adding…"
           className="flex items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
         >
           <Plus className="h-3.5 w-3.5" />
           Add trip
-        </button>
+        </SubmitButton>
       </form>
     </>
   );

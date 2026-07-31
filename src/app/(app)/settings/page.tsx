@@ -1,4 +1,4 @@
-import { MapPin, Plus, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, MapPin, Plus, X } from "lucide-react";
 import DestinationSearchInput from "@/components/destination-search-input";
 import InterestsPicker from "@/components/interests-picker";
 import PlannedTripsSection from "@/components/planned-trips-section";
@@ -11,10 +11,34 @@ import { getDestinations } from "@/lib/destinations-data";
 import { listPlannedTrips } from "@/lib/planned-trips";
 import { getPreferences } from "@/lib/preferences";
 import { upcomingPtoSuggestions } from "@/lib/pto-suggestions";
+import SubmitButton from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+const STATUS_MESSAGES: Record<string, { kind: "success" | "error"; text: string }> = {
+  "visit-added": { kind: "success", text: "Visit added. The calendar and next recommendation are updated." },
+  "visit-removed": { kind: "success", text: "Visit removed." },
+  "visit-error": { kind: "error", text: "That visit could not be saved. Please try again." },
+  "visit-dates-error": { kind: "error", text: "The visit end date must be on or after its start date." },
+  "visit-destination-error": { kind: "error", text: "Enter a three-letter destination airport code, such as LHR." },
+  "destination-added": { kind: "success", text: "Destination added." },
+  "destination-removed": { kind: "success", text: "Destination removed." },
+  "destination-error": { kind: "error", text: "That destination could not be saved." },
+  "interests-saved": { kind: "success", text: "Interests saved. Recommendations are updated." },
+  "interests-error": { kind: "error", text: "Interests could not be saved." },
+  "cadence-saved": { kind: "success", text: "Cadence saved. Recommendations are updated." },
+  "cadence-error": { kind: "error", text: "Enter a valid minimum and maximum cadence." },
+  "pto-saved": { kind: "success", text: "PTO balance saved." },
+  "pto-error": { kind: "error", text: "Enter a valid PTO balance." },
+};
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
+  const notice = status ? STATUS_MESSAGES[status] : undefined;
   const [snapshot, trips, destinationResult, preferences, ptoBalance] = await Promise.all([
     getAvailabilitySnapshot(),
     listPlannedTrips(),
@@ -31,6 +55,24 @@ export default async function SettingsPage() {
           The information used to choose your next visit.
         </p>
       </header>
+
+      {notice && (
+        <div
+          role={notice.kind === "error" ? "alert" : "status"}
+          className={`flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm ${
+            notice.kind === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+              : "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+          }`}
+        >
+          {notice.kind === "success" ? (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          <p>{notice.text}</p>
+        </div>
+      )}
 
       <section id="visits" className="scroll-mt-24">
         <h2 className="text-lg font-semibold">Visits</h2>
@@ -62,9 +104,9 @@ export default async function SettingsPage() {
             <span className="mb-1 block text-xs text-muted">At most</span>
             <input name="cadenceMaxWeeks" type="number" min={1} max={52} defaultValue={preferences.cadenceMaxWeeks} className="w-20 rounded-lg border border-surface-border bg-transparent px-3 py-2" />
           </label>
-          <button type="submit" className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background">
+          <SubmitButton className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background">
             Save cadence
-          </button>
+          </SubmitButton>
         </form>
       </section>
 
@@ -92,9 +134,9 @@ export default async function SettingsPage() {
         </ul>
         <form action={addDestination} className="flex flex-col gap-3 rounded-2xl border border-surface-border bg-surface p-4 shadow-sm sm:flex-row sm:items-end">
           <div className="flex-1"><DestinationSearchInput /></div>
-          <button type="submit" className="flex items-center justify-center gap-1 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background">
+          <SubmitButton pendingLabel="Adding…" className="flex items-center justify-center gap-1 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background">
             <Plus className="h-4 w-4" /> Add
-          </button>
+          </SubmitButton>
         </form>
       </section>
 

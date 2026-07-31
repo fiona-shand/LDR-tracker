@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 
@@ -19,7 +20,7 @@ export async function addDestination(formData: FormData) {
     cityName: formData.get("cityName"),
   });
 
-  if (!parsed.success) return;
+  if (!parsed.success) redirect("/settings?status=destination-error");
 
   try {
     await prisma.destination.upsert({
@@ -28,23 +29,25 @@ export async function addDestination(formData: FormData) {
       create: parsed.data,
     });
   } catch {
-    return;
+    redirect("/settings?status=destination-error");
   }
 
   revalidatePath("/settings");
   revalidatePath("/");
+  redirect("/settings?status=destination-added");
 }
 
 export async function removeDestination(formData: FormData) {
   const id = formData.get("id");
-  if (typeof id !== "string" || !id) return;
+  if (typeof id !== "string" || !id) redirect("/settings?status=destination-error");
 
   try {
     await prisma.destination.delete({ where: { id } });
   } catch {
-    return;
+    redirect("/settings?status=destination-error");
   }
 
   revalidatePath("/settings");
   revalidatePath("/");
+  redirect("/settings?status=destination-removed");
 }

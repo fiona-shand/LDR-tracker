@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { addMonths, format, subMonths } from "date-fns";
-import { ArrowRight, CalendarDays, Check, Clock3, MapPin } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, CheckCircle2, Clock3, MapPin } from "lucide-react";
 import MonthCalendar from "@/components/month-calendar";
 import PlanSidePanel from "@/components/plan-side-panel";
 import { getAvailabilitySnapshot } from "@/lib/availability";
@@ -18,9 +18,9 @@ function proposalDate(proposal: TripProposal) {
 export default async function PlanPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; status?: string }>;
 }) {
-  const { month: monthParam } = await searchParams;
+  const { month: monthParam, status } = await searchParams;
   const snapshot = await getAvailabilitySnapshot();
   const [plan, visits] = await Promise.all([
     buildTripPlan(snapshot, 5, false),
@@ -39,6 +39,13 @@ export default async function PlanPage({
           {best ? best.title : "Let’s find the next open weekend"}
         </h1>
       </header>
+
+      {status === "visit-added" && (
+        <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>Visit added. Its dates are highlighted in the calendar below, and the next recommendation has been recalculated.</p>
+        </div>
+      )}
 
       {best ? (
         <section className="rounded-3xl border border-accent/30 bg-surface p-5 shadow-sm sm:p-7">

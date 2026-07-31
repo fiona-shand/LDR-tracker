@@ -1,5 +1,6 @@
 import { setInterests } from "@/lib/actions/preferences";
 import { INTEREST_LABELS, INTERESTS, type Interest } from "@/lib/interests";
+import SubmitButton from "@/components/submit-button";
 
 /**
  * Checkbox group written straight to Preferences by a server action -- no
@@ -39,12 +40,11 @@ export default function InterestsPicker({ chosen }: { chosen: Interest[] }) {
         ))}
       </div>
 
-      <button
-        type="submit"
-        className="mt-4 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
+      <SubmitButton
+          className="mt-4 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
       >
         Save interests
-      </button>
+      </SubmitButton>
     </form>
   );
 }
