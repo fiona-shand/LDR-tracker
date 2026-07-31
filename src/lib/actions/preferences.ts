@@ -18,8 +18,8 @@ export async function setInterests(formData: FormData) {
     return;
   }
 
-  revalidatePath("/destinations");
-  revalidatePath("/search");
+  revalidatePath("/settings");
+  revalidatePath("/");
 }
 
 export async function setCadence(formData: FormData) {
@@ -40,5 +40,5 @@ export async function setCadence(formData: FormData) {
   }
 
   revalidatePath("/");
-  revalidatePath("/search");
+  revalidatePath("/settings");
 }

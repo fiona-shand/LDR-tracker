@@ -31,8 +31,8 @@ export async function addDestination(formData: FormData) {
     return;
   }
 
-  revalidatePath("/destinations");
-  revalidatePath("/search");
+  revalidatePath("/settings");
+  revalidatePath("/");
 }
 
 export async function removeDestination(formData: FormData) {
@@ -45,6 +45,6 @@ export async function removeDestination(formData: FormData) {
     return;
   }
 
-  revalidatePath("/destinations");
-  revalidatePath("/search");
+  revalidatePath("/settings");
+  revalidatePath("/");
 }

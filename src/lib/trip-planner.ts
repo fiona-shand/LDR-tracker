@@ -365,6 +365,7 @@ export type TripPlan = {
 export async function buildTripPlan(
   snapshot: AvailabilitySnapshot,
   limit = SHORTLIST_SIZE,
+  includeFares = true,
 ): Promise<TripPlan> {
   const [{ destinations, error: destinationsError }, preferences, history] = await Promise.all([
     getDestinations(),
@@ -385,7 +386,7 @@ export async function buildTripPlan(
     limit,
   });
   // Only the shortlist hits the flight API -- see the two-stage note above.
-  const priced = await Promise.all(shortlist.map(faresFor));
+  const priced = includeFares ? await Promise.all(shortlist.map(faresFor)) : shortlist;
 
   // Re-rank on real money now that we have it, keeping unpriced options last.
   const proposals = priced.sort((a, b) => {

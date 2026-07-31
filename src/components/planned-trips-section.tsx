@@ -61,6 +61,7 @@ export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[]
             type="text"
             name="destinationIataCode"
             placeholder="LHR"
+            required
             maxLength={3}
             pattern="[A-Za-z]{3}"
             title="Three-letter airport code, e.g. LHR"

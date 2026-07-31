@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { PEOPLE } from "@/lib/people";
+import { FIONA } from "@/lib/people";
 import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
 
 async function getOrCreateConnection(personId: string) {
@@ -30,42 +30,33 @@ export async function addPlannedTrip(formData: FormData) {
   const endsAt = new Date(`${endsAtRaw}T00:00:00`);
   if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt < startsAt) return;
 
-  const destinationIataCode =
-    typeof destinationRaw === "string" && /^[A-Za-z]{3}$/.test(destinationRaw.trim())
-      ? destinationRaw.trim().toUpperCase()
-      : null;
+  if (typeof destinationRaw !== "string" || !/^[A-Za-z]{3}$/.test(destinationRaw.trim())) return;
+  const destinationIataCode = destinationRaw.trim().toUpperCase();
 
   const externalEventId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   try {
-    for (const person of PEOPLE) {
-      const connection = await getOrCreateConnection(person.id);
-      await prisma.busyBlock.create({
-        data: {
-          personId: person.id,
-          calendarConnectionId: connection.id,
-          externalEventId,
-          title: title.trim(),
-          startsAt,
-          endsAt,
-          isAllDay: true,
-        },
-      });
-    }
-
-    // Destination is optional -- a trip with no airport still blocks out the
-    // dates, it just can't tell the fairness ledger who did the travelling.
-    if (destinationIataCode) {
-      await prisma.trip.create({
-        data: { externalEventId, title: title.trim(), destinationIataCode, startsAt, endsAt },
-      });
-    }
+    const connection = await getOrCreateConnection(FIONA.id);
+    await prisma.busyBlock.create({
+      data: {
+        personId: FIONA.id,
+        calendarConnectionId: connection.id,
+        externalEventId,
+        title: title.trim(),
+        startsAt,
+        endsAt,
+        isAllDay: true,
+      },
+    });
+    await prisma.trip.create({
+      data: { externalEventId, title: title.trim(), destinationIataCode, startsAt, endsAt },
+    });
   } catch {
     return;
   }
 
   revalidatePath("/");
-  revalidatePath("/search");
+  revalidatePath("/settings");
 }
 
 export async function removePlannedTrip(formData: FormData) {
@@ -86,5 +77,5 @@ export async function removePlannedTrip(formData: FormData) {
   }
 
   revalidatePath("/");
-  revalidatePath("/search");
+  revalidatePath("/settings");
 }

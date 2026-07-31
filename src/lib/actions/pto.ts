@@ -28,4 +28,5 @@ export async function setFionaPtoBalance(formData: FormData) {
   }
 
   revalidatePath("/");
+  revalidatePath("/settings");
 }

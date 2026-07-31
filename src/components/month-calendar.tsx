@@ -74,12 +74,14 @@ export default function MonthCalendar({
   prevHref,
   nextHref,
   todayHref,
+  compact = false,
 }: {
   month: Date;
   snapshot: AvailabilitySnapshot;
   prevHref?: string;
   nextHref?: string;
   todayHref?: string;
+  compact?: boolean;
 }) {
   const start = startOfMonth(month);
   const end = endOfMonth(month);
@@ -143,10 +145,9 @@ export default function MonthCalendar({
     }
 
     if (tripFree) {
-      const saturdayIso = format(tripSaturday!, "yyyy-MM-dd");
       return (
         <div key={day.toISOString()} className="group relative flex h-full items-center justify-center">
-          <Link href={`/search?weekend=${saturdayIso}`} className="flex items-center justify-center">
+          <span className="flex items-center justify-center">
             <span
               className={`${CIRCLE} relative bg-day-free text-day-free-ink hover:scale-105 active:scale-95 ${todayRing} ${
                 suggested ? "bg-day-suggested text-day-suggested-ink" : ""
@@ -157,7 +158,7 @@ export default function MonthCalendar({
                 <Star className="absolute -right-1 -top-1 h-3.5 w-3.5 fill-day-suggested-ink text-day-suggested-ink" />
               )}
             </span>
-          </Link>
+          </span>
           <DayTooltip text={tooltip} />
         </div>
       );
@@ -180,7 +181,7 @@ export default function MonthCalendar({
   }
 
   return (
-    <div className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm sm:p-6">
+    <div className={`rounded-2xl border border-surface-border bg-surface p-4 shadow-sm ${compact ? "" : "sm:p-6"}`}>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-lg font-semibold">{format(month, "MMMM yyyy")}</p>
         <div className="flex items-center gap-1">
@@ -225,7 +226,7 @@ export default function MonthCalendar({
         {weeks.map((week, weekIndex) => {
           const bars = barsForRow(week, togetherIntervals);
           return (
-            <div key={weekIndex} className={`relative ${ROW_HEIGHT}`}>
+            <div key={weekIndex} className={`relative ${compact ? "h-12" : ROW_HEIGHT}`}>
               {bars.length > 0 && (
                 <div className="pointer-events-none absolute inset-0 grid grid-cols-7 items-center">
                   {bars.map((seg) => (
@@ -247,12 +248,11 @@ export default function MonthCalendar({
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-surface-border pt-3 text-xs text-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-surface-border pt-3 text-xs text-muted">
         <LegendSwatch className="bg-day-free" label="Free Fri–Sun" />
         <LegendSwatch className="bg-day-suggested" label="Suggested" />
         <LegendSwatch className="bg-day-together" label="Together" />
-        <LegendSwatch className="bg-day-busy" label="One or both busy" />
-        <LegendSwatch className="border border-dashed border-surface-border" label="Not connected" />
+        <LegendSwatch className="bg-day-busy" label="Fiona busy" />
       </div>
     </div>
   );
