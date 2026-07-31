@@ -22,6 +22,16 @@ const TIER_MULTIPLIER: Record<1 | 2 | 3 | 4, number> = {
   4: 1.4,
 };
 
+/**
+ * What a day costs, per person, staying at each other's places.
+ *
+ * Flat, and deliberately NOT scaled by the city's cost tier: per Fiona, London
+ * and Minneapolis cost them the same once they're there, because they're
+ * cooking in and living normally rather than eating out at local restaurant
+ * prices. Tier scaling only applies to hotel trips.
+ */
+const HOME_STAY_FOOD_PER_PERSON_PER_DAY_USD = 36;
+
 export type GroundCostInput = {
   /** Staying at the other person's home -- no hotel needed. */
   isHomeStay: boolean;
@@ -48,7 +58,12 @@ export function estimateGroundCost(input: GroundCostInput | boolean): number {
   const tripDays = days ?? WEEKEND_DAYS;
   const multiplier = TIER_MULTIPLIER[costTier ?? 3];
 
-  const hotel = isHomeStay ? 0 : ESTIMATED_HOTEL_PER_NIGHT_USD * tripNights * multiplier;
+  if (isHomeStay) {
+    // No hotel, and the same daily spend wherever "home" happens to be.
+    return HOME_STAY_FOOD_PER_PERSON_PER_DAY_USD * TRAVELERS * tripDays;
+  }
+
+  const hotel = ESTIMATED_HOTEL_PER_NIGHT_USD * tripNights * multiplier;
   const food = ESTIMATED_FOOD_PER_PERSON_PER_DAY_USD * TRAVELERS * tripDays * multiplier;
   return hotel + food;
 }

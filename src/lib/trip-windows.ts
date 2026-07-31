@@ -24,6 +24,13 @@ const MIN_TRIP_DAYS = 3;
 /** How far ahead to look. Matches the availability snapshot's own horizon. */
 export const PLANNING_HORIZON_DAYS = 200;
 
+/**
+ * Don't propose leaving in the next few days. Transatlantic fares booked
+ * inside a week are punishing, and "fly out tonight" isn't a plan either of
+ * them can act on.
+ */
+export const MIN_LEAD_DAYS = 7;
+
 /** Kept per anchor after Pareto pruning -- enough variety without a blowup. */
 const WINDOWS_PER_ANCHOR = 4;
 
@@ -111,14 +118,15 @@ function windowsForAnchor(
  */
 export function generateTripWindows(
   snapshot: AvailabilitySnapshot,
-  options: { from?: Date; horizonDays?: number } = {},
+  options: { from?: Date; horizonDays?: number; leadDays?: number } = {},
 ): TripWindow[] {
   const from = startOfDay(options.from ?? new Date());
+  const earliestDeparture = addDays(from, options.leadDays ?? MIN_LEAD_DAYS);
   const horizonEnd = addDays(from, options.horizonDays ?? PLANNING_HORIZON_DAYS);
   const holidaySet = holidaySetForRange(from, addDays(horizonEnd, MAX_TRIP_DAYS));
 
   const windows: TripWindow[] = [];
-  let friday = nextFridayOnOrAfter(from);
+  let friday = nextFridayOnOrAfter(earliestDeparture);
 
   while (friday <= horizonEnd) {
     windows.push(...windowsForAnchor(snapshot, friday, holidaySet, horizonEnd));

@@ -109,9 +109,32 @@ describe("generateTripWindows", () => {
   it("finds a longer trip for the same PTO across a holiday weekend", () => {
     // Labor Day is Mon 2026-09-07, so the Fri 2026-09-04 anchor should reach
     // at least Monday without spending a PTO day.
-    const windows = generateTripWindows(snapshot(), { from: d("2026-09-01"), horizonDays: 20 });
+    // leadDays: 0 so the Sep 4 anchor isn't filtered out by booking lead time.
+    const windows = generateTripWindows(snapshot(), {
+      from: d("2026-09-01"),
+      horizonDays: 20,
+      leadDays: 0,
+    });
     const laborDay = windows.filter((w) => w.start.getTime() === d("2026-09-04").getTime());
     const freeOnes = laborDay.filter((w) => w.ptoDays === 0);
     expect(Math.max(...freeOnes.map((w) => w.days))).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("booking lead time", () => {
+  it("does not propose leaving in the next few days", () => {
+    const windows = generateTripWindows(snapshot(), { from: FROM, horizonDays: 60 });
+    const earliest = Math.min(...windows.map((w) => w.start.getTime()));
+    expect(earliest).toBeGreaterThanOrEqual(d("2026-08-10").getTime());
+  });
+
+  it("honours an explicit lead time", () => {
+    const windows = generateTripWindows(snapshot(), {
+      from: FROM,
+      horizonDays: 60,
+      leadDays: 0,
+    });
+    // With no lead time the very next Friday is fair game again.
+    expect(Math.min(...windows.map((w) => w.start.getTime()))).toBe(d("2026-08-07").getTime());
   });
 });

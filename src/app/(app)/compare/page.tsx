@@ -10,6 +10,8 @@ import { formatDuration, isFlightSearchConfigured } from "@/lib/flights";
 import { FIONA, JAKE } from "@/lib/people";
 import { estimateGroundCost } from "@/lib/trip-cost";
 import { buildTripOptions, type LegFare } from "@/lib/trip-options";
+import { buildFairnessLedger } from "@/lib/fairness";
+import { listTripHistory } from "@/lib/trip-history";
 
 export const dynamic = "force-dynamic";
 
@@ -28,20 +30,35 @@ export default async function ComparePage({
   const { weekend: weekendParam } = await searchParams;
 
   const snapshot = await getAvailabilitySnapshot();
-  const upcomingFreeWeekends = getUpcomingWeekends(snapshot, 10).filter((w) => w.bothFree);
+  // Don't filter to bothFree: that's false for every weekend until both
+  // calendars are synced, which would leave nothing selected and nothing to
+  // chart. Prefer a confirmed-free weekend, fall back to the next one.
+  const upcomingWeekends = getUpcomingWeekends(snapshot, 10);
   const weekend =
     (weekendParam ? getWeekendBySaturdayIso(snapshot, weekendParam) : null) ??
-    upcomingFreeWeekends[0] ??
+    upcomingWeekends.find((w) => w.bothFree) ??
+    upcomingWeekends[0] ??
     null;
 
-  const { options, anyRealFares } = await buildTripOptions(weekend);
+  const [{ options, anyRealFares }, history] = await Promise.all([
+    buildTripOptions(weekend),
+    listTripHistory(),
+  ]);
+  const ledger = buildFairnessLedger(history);
 
   const rows = options.map((o) => {
     const fionaHours = (o.fiona.durationMinutes ?? 0) / 60;
     const jakeHours = (o.jake.durationMinutes ?? 0) / 60;
     const groundCost = estimateGroundCost(o.isHomeStay);
     const grandTotal = o.total == null ? null : o.total + groundCost;
-    return { ...o, fionaHours, jakeHours, groundCost, grandTotal };
+    return {
+      ...o,
+      fionaHours,
+      jakeHours,
+      combinedHours: fionaHours + jakeHours,
+      groundCost,
+      grandTotal,
+    };
   });
 
   const chartRows = rows.filter((r) => r.fiona.price != null || r.jake.price != null);
@@ -63,9 +80,9 @@ export default async function ComparePage({
           <span className="font-semibold">
             {format(weekend.friday, "EEE, MMM d")} – {format(weekend.sunday, "EEE, MMM d")}
           </span>
-          {upcomingFreeWeekends.length > 1 && (
+          {upcomingWeekends.length > 1 && (
             <div className="ml-auto flex flex-wrap gap-2">
-              {upcomingFreeWeekends.slice(0, 5).map((w) => {
+              {upcomingWeekends.slice(0, 5).map((w) => {
                 const iso = format(w.saturday, "yyyy-MM-dd");
                 const active = format(weekend.saturday, "yyyy-MM-dd") === iso;
                 return (
@@ -87,7 +104,7 @@ export default async function ComparePage({
         </div>
       ) : (
         <p className="rounded-2xl border border-surface-border bg-surface p-4 text-sm text-muted">
-          No fully-free weekend in the next 10 weeks — check the{" "}
+          No upcoming weekend to compare — check the{" "}
           <Link href="/" className="text-accent underline">
             calendar
           </Link>{" "}
@@ -123,6 +140,35 @@ export default async function ComparePage({
             ]}
             valueFormatter={(v) => `$${v.toFixed(0)}`}
           />
+          <GroupedBarChart
+            title="Total flight cost for both of you"
+            categories={categories}
+            series={[
+              {
+                name: "Flights",
+                color: "var(--series-fiona)",
+                values: chartRows.map((r) => r.total ?? 0),
+              },
+              {
+                name: "Hotel & food",
+                color: "var(--series-jake)",
+                values: chartRows.map((r) => r.groundCost),
+              },
+            ]}
+            valueFormatter={(v) => `$${v.toFixed(0)}`}
+          />
+          <GroupedBarChart
+            title="Total flight time for both of you"
+            categories={categories}
+            series={[
+              {
+                name: "Combined",
+                color: "var(--series-fiona)",
+                values: chartRows.map((r) => r.combinedHours),
+              },
+            ]}
+            valueFormatter={(v) => `${v.toFixed(1)}h`}
+          />
         </div>
       )}
 
@@ -157,6 +203,46 @@ export default async function ComparePage({
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
+        <p className="font-medium">Whose turn is it?</p>
+        {ledger.fionaTravelled + ledger.jakeTravelled + ledger.bothTravelled === 0 ? (
+          <p className="mt-1 text-sm text-muted">
+            No trips recorded with a destination yet — add one on the Calendar page and
+            this starts tracking who&apos;s been doing the flying.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm">
+              <span>
+                <span className="text-muted">{FIONA.name} travelled </span>
+                <span className="font-semibold">{ledger.fionaTravelled}×</span>
+              </span>
+              <span>
+                <span className="text-muted">{JAKE.name} travelled </span>
+                <span className="font-semibold">{ledger.jakeTravelled}×</span>
+              </span>
+              <span>
+                <span className="text-muted">Met in the middle </span>
+                <span className="font-semibold">{ledger.bothTravelled}×</span>
+              </span>
+            </div>
+            {ledger.whoseTurn && (
+              <p className="mt-3 text-sm">
+                Next up:{" "}
+                <span className="font-semibold text-accent">
+                  {ledger.whoseTurn === "fiona" ? FIONA.name : JAKE.name} travels
+                </span>
+              </p>
+            )}
+          </>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          Counts trips by direction only. Fares and flight times from past trips
+          were never recorded, so there&apos;s no historical money or hours total to
+          show — the charts above cover the trip you&apos;re choosing now.
+        </p>
       </div>
 
       <p className="text-xs text-muted">

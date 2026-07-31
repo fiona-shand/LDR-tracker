@@ -39,13 +39,33 @@ const DAYS_SATURATION = 10;
 /** PTO spend that drives the thrift term to zero. */
 const PTO_REFERENCE = 10;
 
+/**
+ * Ground-cost budget the cost term is measured against, in USD.
+ *
+ * Deliberately a fixed reference rather than min/max across the candidate set:
+ * normalising against the range squashes everything, because the extremes
+ * (a 3-day home stay vs three weeks in an expensive city) are thousands apart
+ * and the differences that actually matter are hundreds.
+ */
+const COST_REFERENCE_USD = 2500;
+
+/**
+ * Tuned so the marginal day pays for itself at home but not in a hotel.
+ *
+ * A day together is worth `days` weight / DAYS_SATURATION = 0.02. A day costs
+ * roughly $120 at someone's home (food only) and $270 in a mid-priced city
+ * (food + a room). At these weights that's 0.013/day versus 0.029/day -- so
+ * home stays keep growing until they saturate, and meet-in-the-middle trips
+ * shrink toward a long weekend, which is exactly how they actually travel.
+ * Change `cost` or COST_REFERENCE_USD and that behaviour changes with it.
+ */
 const WEIGHTS = {
-  cadence: 0.25,
+  cadence: 0.2,
   days: 0.2,
-  pto: 0.15,
-  interest: 0.15,
-  cost: 0.15,
-  fairness: 0.1,
+  pto: 0.12,
+  interest: 0.13,
+  cost: 0.27,
+  fairness: 0.08,
 } as const;
 
 /** Applied when we can't confirm both calendars are clear. */
@@ -86,7 +106,7 @@ function primaryCityWord(city: string): string {
  * Everywhere worth considering: the two home cities, your saved destinations,
  * and the curated catalog for places you haven't saved yet.
  */
-function buildDestinationPool(saved: DestinationLike[]): ProposalDestination[] {
+export function buildDestinationPool(saved: DestinationLike[]): ProposalDestination[] {
   const pool: ProposalDestination[] = [
     {
       iataCode: JAKE.airport.iataCode,
@@ -176,15 +196,18 @@ function buildReasons(
 
   if (window.availability.confidence === "unconfirmed") {
     const names = window.availability.unknownNames;
-    if (names.length > 0) reasons.push(`${names.join(" & ")}'s calendar isn't connected`);
+    if (names.length > 1) {
+      reasons.push(`${names.join(" & ")} haven't connected calendars`);
+    } else if (names.length === 1) {
+      reasons.push(`${names[0]} hasn't connected a calendar`);
+    }
   }
 
   return reasons;
 }
 
-function normalise(value: number, min: number, max: number): number {
-  if (max <= min) return 0.5;
-  return (value - min) / (max - min);
+function clamp01(value: number): number {
+  return Math.min(Math.max(value, 0), 1);
 }
 
 /**
@@ -215,16 +238,13 @@ function scoreCandidates(
 
   if (rows.length === 0) return [];
 
-  const minCost = Math.min(...rows.map((r) => r.groundCost));
-  const maxCost = Math.max(...rows.map((r) => r.groundCost));
-
   return rows.map((row) => {
     const cadence = cadenceFit(row.window.start, priorTripEnd(tripEnds, row.window.start));
     const interestScore = interestMatch(row.destination.interests, chosenInterests);
 
     const daysScore = Math.min(row.window.days / DAYS_SATURATION, 1);
     const ptoScore = Math.max(0, 1 - row.window.ptoDays / PTO_REFERENCE);
-    const costScore = 1 - normalise(row.groundCost, minCost, maxCost);
+    const costScore = clamp01(1 - row.groundCost / COST_REFERENCE_USD);
     const fairness = fairnessScore(row.destination.iataCode, ledger);
 
     const raw =
@@ -280,6 +300,34 @@ function diversify(proposals: TripProposal[], limit: number): TripProposal[] {
   }
 
   return picked;
+}
+
+/**
+ * Stage one end to end: score every candidate and pick a diverse shortlist.
+ * Pure -- no database, no network -- so the ranking rules can be tested
+ * directly.
+ */
+export function rankProposals(input: {
+  windows: TripWindow[];
+  pool: ProposalDestination[];
+  chosenInterests: Interest[];
+  ledger: FairnessLedger;
+  tripEnds: { endsAt: Date }[];
+  limit: number;
+}): { shortlist: TripProposal[]; ranked: TripProposal[]; candidatesScored: number } {
+  const ranked = scoreCandidates(
+    input.windows,
+    input.pool,
+    input.chosenInterests,
+    input.ledger,
+    input.tripEnds,
+  ).sort((a, b) => b.score - a.score);
+
+  return {
+    shortlist: diversify(ranked, input.limit),
+    ranked,
+    candidatesScored: ranked.length,
+  };
 }
 
 async function faresFor(proposal: TripProposal): Promise<TripProposal> {
@@ -341,11 +389,14 @@ export async function buildTripPlan(
   const windows = generateTripWindows(snapshot);
   const pool = buildDestinationPool(destinations);
 
-  const scored = scoreCandidates(windows, pool, preferences.interests, ledger, history).sort(
-    (a, b) => b.score - a.score,
-  );
-
-  const shortlist = diversify(scored, limit);
+  const { shortlist, candidatesScored } = rankProposals({
+    windows,
+    pool,
+    chosenInterests: preferences.interests,
+    ledger,
+    tripEnds: history,
+    limit,
+  });
   // Only the shortlist hits the flight API -- see the two-stage note above.
   const priced = await Promise.all(shortlist.map(faresFor));
 
@@ -362,7 +413,7 @@ export async function buildTripPlan(
     ledger,
     chosenInterests: preferences.interests,
     windowsConsidered: windows.length,
-    candidatesScored: scored.length,
+    candidatesScored,
     destinationsError,
   };
 }

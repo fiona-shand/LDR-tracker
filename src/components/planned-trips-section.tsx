@@ -53,6 +53,21 @@ export default function PlannedTripsSection({ trips }: { trips: PlannedTripRow[]
           />
         </div>
         <div>
+          <label htmlFor="trip-destination" className="mb-1 block text-xs text-muted">
+            Airport
+          </label>
+          <input
+            id="trip-destination"
+            type="text"
+            name="destinationIataCode"
+            placeholder="LHR"
+            maxLength={3}
+            pattern="[A-Za-z]{3}"
+            title="Three-letter airport code, e.g. LHR"
+            className="w-20 rounded-lg border border-surface-border bg-transparent px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-accent/40"
+          />
+        </div>
+        <div>
           <label htmlFor="trip-start" className="mb-1 block text-xs text-muted">
             From
           </label>
