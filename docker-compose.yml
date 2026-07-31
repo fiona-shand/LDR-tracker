@@ -1,0 +1,28 @@
+# Throwaway Postgres for local development.
+#
+#   npm run db:up      start it
+#   npm run db:down    stop it (data survives -- it's in a named volume)
+#
+# Port 5433 on purpose, so it doesn't collide with a Postgres you may already
+# be running on the default 5432.
+services:
+  db:
+    image: postgres:16
+    container_name: ldr-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ldr
+      POSTGRES_PASSWORD: ldr
+      POSTGRES_DB: ldr_tracker
+    ports:
+      - "5433:5432"
+    volumes:
+      - ldr-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ldr -d ldr_tracker"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  ldr-pgdata:

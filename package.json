@@ -8,7 +8,17 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:demo": "tsx scripts/seed-demo.ts",
+    "db:backfill": "tsx scripts/backfill-trips.ts",
+    "setup": "npm run db:up && npm run db:migrate && npm run db:seed && npm run db:demo"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
