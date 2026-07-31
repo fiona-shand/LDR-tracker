@@ -7,11 +7,11 @@ const d = (iso: string) => {
   return new Date(y, m - 1, day);
 };
 
-function snapshot(busy: { fiona?: string[]; jake?: string[] } = {}): AvailabilitySnapshot {
+function snapshot(busy: string[] = []): AvailabilitySnapshot {
   return {
-    busyDates: { fiona: new Set(busy.fiona ?? []), jake: new Set(busy.jake ?? []) },
-    busyEvents: { fiona: {}, jake: {} },
-    sources: { fiona: "real", jake: "unconnected" },
+    busyDates: new Set(busy),
+    busyEvents: {},
+    source: "real",
     togetherDates: new Set(),
   };
 }
@@ -20,12 +20,10 @@ function snapshot(busy: { fiona?: string[]; jake?: string[] } = {}): Availabilit
 const FROM = d("2026-08-03");
 
 describe("generateTripWindows", () => {
-  it("produces windows even though Jake has no calendar connected", () => {
-    // The whole feature would return nothing if it filtered on bothFree.
+  it("produces windows when Fiona is available", () => {
     const windows = generateTripWindows(snapshot(), { from: FROM, horizonDays: 60 });
     expect(windows.length).toBeGreaterThan(0);
-    expect(windows.every((w) => w.availability.bothFree)).toBe(false);
-    expect(windows.every((w) => w.availability.noOneBusy)).toBe(true);
+    expect(windows.every((w) => w.availability.available)).toBe(true);
   });
 
   it("anchors every window on a Friday departure", () => {
@@ -40,7 +38,7 @@ describe("generateTripWindows", () => {
 
   it("never spans a day either person is known busy", () => {
     // Fiona busy on Sun 2026-08-09 kills the first weekend outright.
-    const windows = generateTripWindows(snapshot({ fiona: ["2026-08-09"] }), {
+    const windows = generateTripWindows(snapshot(["2026-08-09"]), {
       from: FROM,
       horizonDays: 30,
     });
@@ -50,18 +48,8 @@ describe("generateTripWindows", () => {
     expect(spansBusyDay).toBe(false);
   });
 
-  it("respects a busy day belonging to either person", () => {
-    const windows = generateTripWindows(snapshot({ jake: ["2026-08-09"] }), {
-      from: FROM,
-      horizonDays: 30,
-    });
-    expect(
-      windows.some((w) => w.start <= d("2026-08-09") && w.end >= d("2026-08-09")),
-    ).toBe(false);
-  });
-
   it("drops an anchor entirely when the departure Friday is busy", () => {
-    const windows = generateTripWindows(snapshot({ fiona: ["2026-08-07"] }), {
+    const windows = generateTripWindows(snapshot(["2026-08-07"]), {
       from: FROM,
       horizonDays: 20,
     });

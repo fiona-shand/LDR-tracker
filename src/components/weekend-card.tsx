@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { CalendarCheck2, HelpCircle, X } from "lucide-react";
+import { CalendarCheck2, X } from "lucide-react";
 import type { WeekendAvailability } from "@/lib/availability";
 
 export default function WeekendCard({ weekend }: { weekend: WeekendAvailability }) {
   const saturdayIso = format(weekend.saturday, "yyyy-MM-dd");
   const dateLabel = `${format(weekend.friday, "EEE, MMM d")} – ${format(weekend.sunday, "EEE, MMM d")}`;
 
-  if (weekend.bothFree) {
+  if (weekend.available) {
     return (
       <Link
         href={`/search?weekend=${saturdayIso}`}
@@ -19,7 +19,7 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
           </span>
           <div>
             <p className="font-medium">{dateLabel}</p>
-            <p className="text-sm text-muted">Both free — plan a trip</p>
+            <p className="text-sm text-muted">Fiona is free — plan a trip</p>
           </div>
         </div>
         <span className="flex items-center gap-1 text-sm font-medium text-accent">
@@ -38,20 +38,10 @@ export default function WeekendCard({ weekend }: { weekend: WeekendAvailability 
         .join(" & ")} busy`,
     );
   }
-  if (weekend.unknownNames.length > 0) {
-    parts.push(
-      `${weekend.unknownNames.join(" & ")} ${weekend.unknownNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`,
-    );
-  }
-
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-surface-border bg-surface p-4 opacity-60">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-border/50 text-muted">
-        {weekend.busyDetails.length === 0 && weekend.unknownNames.length > 0 ? (
-          <HelpCircle className="h-4 w-4" />
-        ) : (
-          <X className="h-4 w-4" />
-        )}
+        <X className="h-4 w-4" />
       </span>
       <div>
         <p className="font-medium">{dateLabel}</p>

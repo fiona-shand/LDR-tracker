@@ -1,6 +1,5 @@
 import { addDays, format, startOfDay } from "date-fns";
 import type { AvailabilitySnapshot } from "@/lib/availability";
-import { FIONA } from "@/lib/people";
 import { optumHolidays, type Holiday } from "@/lib/us-holidays";
 
 export type PtoSuggestion = {
@@ -100,7 +99,7 @@ export function upcomingPtoSuggestions(
     .filter((s) => {
       let cursor = s.windowStart;
       while (cursor <= s.windowEnd) {
-        if (snapshot.busyDates[FIONA.id].has(format(cursor, "yyyy-MM-dd"))) return false;
+        if (snapshot.busyDates.has(format(cursor, "yyyy-MM-dd"))) return false;
         cursor = addDays(cursor, 1);
       }
       return true;

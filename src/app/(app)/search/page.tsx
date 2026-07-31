@@ -41,7 +41,7 @@ export default async function SearchPage({
   const upcomingWeekends = getUpcomingWeekends(snapshot, 40);
   const weekend =
     (weekendParam ? getWeekendBySaturdayIso(snapshot, weekendParam) : null) ??
-    upcomingWeekends.find((w) => w.bothFree) ??
+    upcomingWeekends.find((w) => w.available) ??
     upcomingWeekends[0] ??
     null;
 

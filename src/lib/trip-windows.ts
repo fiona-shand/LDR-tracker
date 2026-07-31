@@ -1,11 +1,10 @@
 import { addDays, startOfDay } from "date-fns";
 import {
   getRangeAvailability,
-  personDayStatus,
+  isFionaFree,
   type AvailabilitySnapshot,
   type RangeAvailability,
 } from "@/lib/availability";
-import { PEOPLE } from "@/lib/people";
 import { holidaySetForRange, ptoDaysNeeded, ptoEfficiency } from "@/lib/pto-cost";
 
 /**
@@ -45,8 +44,8 @@ export type TripWindow = {
   availability: RangeAvailability;
 };
 
-function isBusyForAnyone(snapshot: AvailabilitySnapshot, date: Date): boolean {
-  return PEOPLE.some((p) => personDayStatus(snapshot, p.id, date) === "busy");
+function isFionaBusy(snapshot: AvailabilitySnapshot, date: Date): boolean {
+  return !isFionaFree(snapshot, date);
 }
 
 function nextFridayOnOrAfter(date: Date): Date {
@@ -82,7 +81,7 @@ function windowsForAnchor(
   holidaySet: Set<string>,
   horizonEnd: Date,
 ): TripWindow[] {
-  if (isBusyForAnyone(snapshot, friday)) return [];
+  if (isFionaBusy(snapshot, friday)) return [];
 
   const candidates: TripWindow[] = [];
 
@@ -91,7 +90,7 @@ function windowsForAnchor(
   for (let length = MIN_TRIP_DAYS; length <= MAX_TRIP_DAYS; length++) {
     const end = addDays(friday, length - 1);
     if (end > horizonEnd) break;
-    if (isBusyForAnyone(snapshot, end)) break;
+    if (isFionaBusy(snapshot, end)) break;
 
     const ptoDays = ptoDaysNeeded(friday, end, holidaySet);
     candidates.push({

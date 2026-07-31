@@ -30,13 +30,11 @@ export default async function ComparePage({
   const { weekend: weekendParam } = await searchParams;
 
   const snapshot = await getAvailabilitySnapshot();
-  // Don't filter to bothFree: that's false for every weekend until both
-  // calendars are synced, which would leave nothing selected and nothing to
-  // chart. Prefer a confirmed-free weekend, fall back to the next one.
+  // Prefer a Fiona-free weekend, then fall back to the next one.
   const upcomingWeekends = getUpcomingWeekends(snapshot, 10);
   const weekend =
     (weekendParam ? getWeekendBySaturdayIso(snapshot, weekendParam) : null) ??
-    upcomingWeekends.find((w) => w.bothFree) ??
+    upcomingWeekends.find((w) => w.available) ??
     upcomingWeekends[0] ??
     null;
 

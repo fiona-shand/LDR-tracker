@@ -1,25 +1,20 @@
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
-import { PEOPLE } from "@/lib/people";
+import { FIONA } from "@/lib/people";
 import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
-
-export type PersonId = (typeof PEOPLE)[number]["id"];
 
 const HORIZON_DAYS = 200;
 
 export type AvailabilitySnapshot = {
-  busyDates: Record<PersonId, Set<string>>;
-  busyEvents: Record<PersonId, Record<string, string[]>>;
-  /** "real" = has a genuinely synced calendar. A manually-added planned trip
-   * can still mark specific days busy for an "unconnected" person -- it just
-   * doesn't tell us anything about the rest of their calendar. */
-  sources: Record<PersonId, "real" | "unconnected">;
+  busyDates: Set<string>;
+  busyEvents: Record<string, string[]>;
+  source: "real" | "unconnected";
   /** Dates from the "Planned trips" connection specifically -- a reliable
    * "we're together" signal regardless of how the trip was titled. */
   togetherDates: Set<string>;
 };
 
-async function getPersonData(personId: PersonId): Promise<{
+async function getFionaData(): Promise<{
   dates: Set<string>;
   events: Record<string, string[]>;
   source: "real" | "unconnected";
@@ -31,10 +26,10 @@ async function getPersonData(personId: PersonId): Promise<{
 
     const [realConnection, blocks] = await Promise.all([
       prisma.calendarConnection.findFirst({
-        where: { personId, provider: "ICS", icsUrl: { not: null } },
+        where: { personId: FIONA.id, provider: "ICS", icsUrl: { not: null } },
       }),
       prisma.busyBlock.findMany({
-        where: { personId, startsAt: { lte: horizonEnd }, endsAt: { gte: today } },
+        where: { personId: FIONA.id, startsAt: { lte: horizonEnd }, endsAt: { gte: today } },
         select: {
           startsAt: true,
           endsAt: true,
@@ -69,20 +64,13 @@ async function getPersonData(personId: PersonId): Promise<{
 }
 
 export async function getAvailabilitySnapshot(): Promise<AvailabilitySnapshot> {
-  const busyDates = {} as Record<PersonId, Set<string>>;
-  const busyEvents = {} as Record<PersonId, Record<string, string[]>>;
-  const sources = {} as Record<PersonId, "real" | "unconnected">;
-  const togetherDates = new Set<string>();
-
-  for (const person of PEOPLE) {
-    const data = await getPersonData(person.id);
-    busyDates[person.id] = data.dates;
-    busyEvents[person.id] = data.events;
-    sources[person.id] = data.source;
-    for (const iso of data.togetherDates) togetherDates.add(iso);
-  }
-
-  return { busyDates, busyEvents, sources, togetherDates };
+  const data = await getFionaData();
+  return {
+    busyDates: data.dates,
+    busyEvents: data.events,
+    source: data.source,
+    togetherDates: data.togetherDates,
+  };
 }
 
 /** Whether this day is part of a recorded "we're together" trip. */
@@ -116,39 +104,19 @@ export function getTogetherIntervals(snapshot: AvailabilitySnapshot): DateInterv
 /** Event titles (e.g. "Concert", "Trip to Rome") that make this person busy on this day. */
 export function getBusyTitles(
   snapshot: AvailabilitySnapshot,
-  personId: PersonId,
   date: Date,
 ): string[] {
-  return snapshot.busyEvents[personId][format(date, "yyyy-MM-dd")] ?? [];
+  return snapshot.busyEvents[format(date, "yyyy-MM-dd")] ?? [];
 }
 
-export type PersonDayStatus = "free" | "busy" | "unknown";
-
-/**
- * A specific known-busy day (real sync or a manually-added planned trip)
- * always reports "busy", even for someone without a connected calendar --
- * everything else is "unknown" until they connect one.
- */
-export function personDayStatus(
-  snapshot: AvailabilitySnapshot,
-  personId: PersonId,
-  date: Date,
-): PersonDayStatus {
-  const busy = snapshot.busyDates[personId].has(format(date, "yyyy-MM-dd"));
-  if (busy) return "busy";
-  return snapshot.sources[personId] === "real" ? "free" : "unknown";
+export function isFionaFree(snapshot: AvailabilitySnapshot, date: Date): boolean {
+  return !snapshot.busyDates.has(format(date, "yyyy-MM-dd"));
 }
 
-export type DayStatus = "both-free" | "one-busy" | "both-busy" | "unknown";
+export type DayStatus = "free" | "busy";
 
 export function getDayStatus(snapshot: AvailabilitySnapshot, date: Date): DayStatus {
-  const statuses = PEOPLE.map((p) => personDayStatus(snapshot, p.id, date));
-  const busyCount = statuses.filter((s) => s === "busy").length;
-
-  if (busyCount === PEOPLE.length) return "both-busy";
-  if (busyCount > 0) return "one-busy";
-  if (statuses.includes("unknown")) return "unknown";
-  return "both-free";
+  return isFionaFree(snapshot, date) ? "free" : "busy";
 }
 
 function getNextOrCurrentSaturday(date: Date): Date {
@@ -163,19 +131,9 @@ export type RangeAvailability = {
   /** Calendar days inclusive of both ends. */
   days: number;
   nights: number;
-  /** Nobody is KNOWN busy. Unknown days are allowed -- this is the real filter. */
-  noOneBusy: boolean;
-  /** Nobody busy AND nobody unknown. Requires everyone to have a synced calendar. */
-  bothFree: boolean;
-  /**
-   * "confirmed" only when every day is positively known free for everyone.
-   * While someone hasn't connected a calendar this stays "unconfirmed" --
-   * a trip is still worth proposing, we just can't promise they're free.
-   */
-  confidence: "confirmed" | "unconfirmed";
+  available: boolean;
   busyNames: string[];
   busyDetails: { name: string; titles: string[] }[];
-  unknownNames: string[];
 };
 
 function eachDay(start: Date, end: Date): Date[] {
@@ -200,33 +158,17 @@ export function getRangeAvailability(
 ): RangeAvailability {
   const tripDays = eachDay(start, end);
 
-  const busyPeople = PEOPLE.filter((p) =>
-    tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "busy"),
-  );
-  const unknownPeople = PEOPLE.filter(
-    (p) =>
-      !busyPeople.includes(p) &&
-      tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "unknown"),
-  );
-  const busyDetails = busyPeople.map((p) => ({
-    name: p.name,
-    titles: Array.from(new Set(tripDays.flatMap((d) => getBusyTitles(snapshot, p.id, d)))),
-  }));
-
-  const noOneBusy = busyPeople.length === 0;
-  const bothFree = noOneBusy && unknownPeople.length === 0;
+  const busy = tripDays.some((date) => !isFionaFree(snapshot, date));
+  const titles = Array.from(new Set(tripDays.flatMap((date) => getBusyTitles(snapshot, date))));
 
   return {
     start: startOfDay(start),
     end: startOfDay(end),
     days: tripDays.length,
     nights: Math.max(tripDays.length - 1, 0),
-    noOneBusy,
-    bothFree,
-    confidence: bothFree ? "confirmed" : "unconfirmed",
-    busyNames: busyPeople.map((p) => p.name),
-    busyDetails,
-    unknownNames: unknownPeople.map((p) => p.name),
+    available: !busy,
+    busyNames: busy ? [FIONA.name] : [],
+    busyDetails: busy ? [{ name: FIONA.name, titles }] : [],
   };
 }
 
@@ -234,11 +176,9 @@ export type WeekendAvailability = {
   friday: Date;
   saturday: Date;
   sunday: Date;
-  bothFree: boolean;
+  available: boolean;
   busyNames: string[];
   busyDetails: { name: string; titles: string[] }[];
-  /** People with no calendar connected and no known-busy day this weekend. */
-  unknownNames: string[];
 };
 
 // A "weekend trip" leaves Friday afternoon and returns Sunday, so Friday has
@@ -252,10 +192,9 @@ function weekendFor(snapshot: AvailabilitySnapshot, saturday: Date): WeekendAvai
     friday,
     saturday,
     sunday,
-    bothFree: range.bothFree,
+    available: range.available,
     busyNames: range.busyNames,
     busyDetails: range.busyDetails,
-    unknownNames: range.unknownNames,
   };
 }
 

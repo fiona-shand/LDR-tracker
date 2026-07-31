@@ -15,7 +15,7 @@ export function isSuggestedWeekend(
   snapshot: AvailabilitySnapshot,
   weekend: WeekendAvailability,
 ): boolean {
-  if (!weekend.bothFree) return false;
+  if (!weekend.available) return false;
 
   const today = startOfDay(new Date());
   const intervals = getTogetherIntervals(snapshot);

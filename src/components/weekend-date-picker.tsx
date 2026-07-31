@@ -110,7 +110,7 @@ export default function WeekendDatePicker({
 
           const saturdayIso = format(tripSaturday, "yyyy-MM-dd");
           const tripWeekend = getWeekendBySaturdayIso(snapshot, saturdayIso);
-          const free = !!tripWeekend?.bothFree;
+          const free = !!tripWeekend?.available;
           const together = isTogetherDay(snapshot, day);
           const busy = !free && !together && (tripWeekend?.busyNames.length ?? 0) > 0;
           const suggested = free && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
@@ -136,9 +136,7 @@ export default function WeekendDatePicker({
                 ? "Together"
                 : busy
                   ? `${tripWeekend!.busyNames.join(" & ")} busy`
-                  : tripWeekend && tripWeekend.unknownNames.length > 0
-                    ? `${tripWeekend.unknownNames.join(" & ")} ${tripWeekend.unknownNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
-                    : undefined;
+                  : undefined;
 
           return (
             <Link

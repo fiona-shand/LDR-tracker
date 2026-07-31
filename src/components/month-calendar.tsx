@@ -10,7 +10,7 @@ import {
   type AvailabilitySnapshot,
   type DateInterval,
 } from "@/lib/availability";
-import { PEOPLE } from "@/lib/people";
+import { FIONA } from "@/lib/people";
 import { isSuggestedWeekend } from "@/lib/trip-suggestions";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -87,7 +87,6 @@ export default function MonthCalendar({
   const today = startOfDay(new Date());
   const weeks = buildWeeks(days, start.getDay());
 
-  const unconnectedNames = PEOPLE.filter((p) => snapshot.sources[p.id] !== "real").map((p) => p.name);
   const togetherIntervals = getTogetherIntervals(snapshot);
   const togetherEndpoints = new Set<number>();
   for (const iv of togetherIntervals) {
@@ -106,17 +105,15 @@ export default function MonthCalendar({
     const tripWeekend = tripSaturday
       ? getWeekendBySaturdayIso(snapshot, format(tripSaturday, "yyyy-MM-dd"))
       : null;
-    const tripFree = !isPast && !together && !!tripWeekend?.bothFree;
+    const tripFree = !isPast && !together && !!tripWeekend?.available;
     const suggested = tripFree && tripWeekend != null && isSuggestedWeekend(snapshot, tripWeekend);
 
-    const dayEvents = PEOPLE.map((p) => ({ name: p.name, titles: getBusyTitles(snapshot, p.id, day) })).filter(
-      (e) => e.titles.length > 0,
+    const dayEvents = [{ name: FIONA.name, titles: getBusyTitles(snapshot, day) }].filter(
+      (event) => event.titles.length > 0,
     );
     const eventText = dayEvents.map((e) => `${e.name}: ${e.titles.join(", ")}`).join(" · ") || undefined;
     const tooltip =
-      status === "unknown" && !eventText
-        ? `${unconnectedNames.join(" & ")} ${unconnectedNames.length > 1 ? "haven't" : "hasn't"} connected a calendar`
-        : suggested
+      suggested
           ? `${eventText ? `${eventText} · ` : ""}Suggested — it's been a while since your last trip`
           : tripFree
             ? "Free Friday–Sunday"
@@ -168,9 +165,7 @@ export default function MonthCalendar({
 
     const fillClasses = isPast
       ? "text-muted/40"
-      : status === "unknown"
-        ? "border border-dashed border-surface-border text-muted/70"
-        : status === "both-busy" || status === "one-busy"
+      : status === "busy"
           ? "bg-day-busy text-day-busy-ink"
           : "text-foreground";
 

@@ -1,7 +1,7 @@
 import { addDays, differenceInCalendarDays, startOfDay } from "date-fns";
 import type { AvailabilitySnapshot } from "@/lib/availability";
 import { CADENCE_MAX_WEEKS, CADENCE_MIN_WEEKS } from "@/lib/cadence";
-import { PEOPLE } from "@/lib/people";
+import { JAKE, PEOPLE } from "@/lib/people";
 import type { PlannedTripRow } from "@/lib/planned-trips";
 
 /**
@@ -40,13 +40,9 @@ function looksLikeVisit(title: string, otherPerson: Person): boolean {
 export function detectVisitDates(snapshot: AvailabilitySnapshot): Date[] {
   const isoDates = new Set<string>(snapshot.togetherDates);
 
-  for (const person of PEOPLE) {
-    const other = PEOPLE.find((p) => p.id !== person.id)!;
-    const events = snapshot.busyEvents[person.id];
-    for (const [iso, titles] of Object.entries(events)) {
-      if (titles.some((title) => looksLikeVisit(title, other))) {
-        isoDates.add(iso);
-      }
+  for (const [iso, titles] of Object.entries(snapshot.busyEvents)) {
+    if (titles.some((title) => looksLikeVisit(title, JAKE))) {
+      isoDates.add(iso);
     }
   }
 

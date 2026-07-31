@@ -12,9 +12,9 @@ const d = (iso: string) => {
 
 function snapshot(overrides: Partial<AvailabilitySnapshot> = {}): AvailabilitySnapshot {
   return {
-    busyDates: { fiona: new Set(), jake: new Set() },
-    busyEvents: { fiona: {}, jake: {} },
-    sources: { fiona: "real", jake: "unconnected" },
+    busyDates: new Set(),
+    busyEvents: {},
+    source: "real",
     togetherDates: new Set(),
     ...overrides,
   };
@@ -27,44 +27,29 @@ describe("getRangeAvailability", () => {
     expect(r.nights).toBe(2);
   });
 
-  it("reports noOneBusy but NOT bothFree while Jake has no calendar", () => {
-    // This is the exact condition that made the old weekend-only engine return
-    // nothing: bothFree is false for every window until Jake connects a feed.
+  it("reports an available range when Fiona is clear", () => {
     const r = getRangeAvailability(snapshot(), d("2026-08-07"), d("2026-08-09"));
-    expect(r.noOneBusy).toBe(true);
-    expect(r.bothFree).toBe(false);
-    expect(r.confidence).toBe("unconfirmed");
-    expect(r.unknownNames).toEqual(["Jake"]);
-  });
-
-  it("reports confirmed when both calendars are synced and clear", () => {
-    const r = getRangeAvailability(
-      snapshot({ sources: { fiona: "real", jake: "real" } }),
-      d("2026-08-07"),
-      d("2026-08-09"),
-    );
-    expect(r.bothFree).toBe(true);
-    expect(r.confidence).toBe("confirmed");
+    expect(r.available).toBe(true);
   });
 
   it("flags a range containing a known-busy day", () => {
     const s = snapshot({
-      busyDates: { fiona: new Set(["2026-08-08"]), jake: new Set() },
-      busyEvents: { fiona: { "2026-08-08": ["Wedding"] }, jake: {} },
+      busyDates: new Set(["2026-08-08"]),
+      busyEvents: { "2026-08-08": ["Wedding"] },
     });
     const r = getRangeAvailability(s, d("2026-08-07"), d("2026-08-09"));
-    expect(r.noOneBusy).toBe(false);
+    expect(r.available).toBe(false);
     expect(r.busyNames).toEqual(["Fiona"]);
     expect(r.busyDetails[0].titles).toEqual(["Wedding"]);
   });
 
   it("does not flag a busy day that falls just outside the range", () => {
     const s = snapshot({
-      busyDates: { fiona: new Set(["2026-08-10"]), jake: new Set() },
-      busyEvents: { fiona: { "2026-08-10": ["Wedding"] }, jake: {} },
+      busyDates: new Set(["2026-08-10"]),
+      busyEvents: { "2026-08-10": ["Wedding"] },
     });
     const r = getRangeAvailability(s, d("2026-08-07"), d("2026-08-09"));
-    expect(r.noOneBusy).toBe(true);
+    expect(r.available).toBe(true);
   });
 
   it("handles a long multi-week range", () => {

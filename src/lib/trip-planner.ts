@@ -68,9 +68,6 @@ const WEIGHTS = {
   fairness: 0.08,
 } as const;
 
-/** Applied when we can't confirm both calendars are clear. */
-const UNCONFIRMED_MULTIPLIER = 0.85;
-
 export type ProposalDestination = {
   iataCode: string;
   cityName: string;
@@ -194,15 +191,6 @@ function buildReasons(
   const fairness = fairnessReason(destination.iataCode, ledger);
   if (fairness) reasons.push(fairness);
 
-  if (window.availability.confidence === "unconfirmed") {
-    const names = window.availability.unknownNames;
-    if (names.length > 1) {
-      reasons.push(`${names.join(" & ")} haven't connected calendars`);
-    } else if (names.length === 1) {
-      reasons.push(`${names[0]} hasn't connected a calendar`);
-    }
-  }
-
   return reasons;
 }
 
@@ -255,8 +243,7 @@ function scoreCandidates(
       WEIGHTS.cost * costScore +
       WEIGHTS.fairness * fairness;
 
-    const score =
-      row.window.availability.confidence === "confirmed" ? raw : raw * UNCONFIRMED_MULTIPLIER;
+    const score = raw;
 
     return {
       key: `${format(row.window.start, "yyyy-MM-dd")}-${row.window.days}-${row.destination.iataCode}`,

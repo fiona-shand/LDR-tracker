@@ -14,9 +14,9 @@ const FROM = d("2026-08-03");
 
 function snapshot(): AvailabilitySnapshot {
   return {
-    busyDates: { fiona: new Set(), jake: new Set() },
-    busyEvents: { fiona: {}, jake: {} },
-    sources: { fiona: "real", jake: "unconnected" },
+    busyDates: new Set(),
+    busyEvents: {},
+    source: "real",
     togetherDates: new Set(),
   };
 }
@@ -41,7 +41,7 @@ function rank(opts: {
 }
 
 describe("rankProposals", () => {
-  it("returns proposals even with no interests, no history and Jake unconnected", () => {
+  it("returns proposals even with no interests or history", () => {
     const { shortlist } = rank();
     expect(shortlist.length).toBe(6);
     expect(shortlist.every((p) => p.window.days >= 3)).toBe(true);
@@ -139,16 +139,6 @@ describe("rankProposals", () => {
     const { ranked } = rank();
     const free = ranked.find((p) => p.window.ptoDays === 0)!;
     expect(free.reasons[0]).toContain("no PTO");
-  });
-
-  it("flags that Jake's calendar isn't connected, naming only him", () => {
-    // Fiona is synced in this snapshot, so the reason must not implicate her.
-    const { shortlist } = rank();
-    expect(
-      shortlist.every((p) =>
-        p.reasons.some((r) => r === "Jake hasn't connected a calendar"),
-      ),
-    ).toBe(true);
   });
 
   it("scores every proposal between 0 and 1", () => {
