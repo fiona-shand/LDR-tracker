@@ -1,6 +1,3 @@
-// A weekend trip is Friday-Sunday: 2 nights, 3 days (see availability.ts).
-const TRIP_NIGHTS = 2;
-const TRIP_DAYS = 3;
 const TRAVELERS = 2;
 
 // Flat, clearly-labeled estimates -- not a real quote like the flight fares.
@@ -8,9 +5,50 @@ const TRAVELERS = 2;
 export const ESTIMATED_HOTEL_PER_NIGHT_USD = 150;
 export const ESTIMATED_FOOD_PER_PERSON_PER_DAY_USD = 60;
 
-/** Estimated hotel + food for the trip. $0 hotel when staying at the other person's home. */
-export function estimateGroundCost(isHomeStay: boolean): number {
-  const hotel = isHomeStay ? 0 : ESTIMATED_HOTEL_PER_NIGHT_USD * TRIP_NIGHTS;
-  const food = ESTIMATED_FOOD_PER_PERSON_PER_DAY_USD * TRAVELERS * TRIP_DAYS;
+// A weekend trip is Friday-Sunday: 2 nights, 3 days (see availability.ts).
+// Used as the default so existing weekend-only callers behave exactly as before.
+const WEEKEND_NIGHTS = 2;
+const WEEKEND_DAYS = 3;
+
+/**
+ * Cost tier (1 cheap - 4 expensive) scales hotel and food away from the flat
+ * baseline, so a long stay in an expensive city is priced like one. Tier 3 is
+ * treated as the baseline the flat estimates were written for.
+ */
+const TIER_MULTIPLIER: Record<1 | 2 | 3 | 4, number> = {
+  1: 0.5,
+  2: 0.75,
+  3: 1,
+  4: 1.4,
+};
+
+export type GroundCostInput = {
+  /** Staying at the other person's home -- no hotel needed. */
+  isHomeStay: boolean;
+  nights?: number;
+  days?: number;
+  costTier?: 1 | 2 | 3 | 4 | null;
+};
+
+/**
+ * Estimated hotel + food for the trip. $0 hotel when staying at the other
+ * person's home.
+ *
+ * Duration matters: hotel is charged per night, so a two-week meet-in-the-middle
+ * carries two weeks of hotel while two weeks at Jake's carries none. That single
+ * fact is what makes the planner naturally prefer long home stays and short
+ * meet-in-the-middle trips, with no separate rule for either.
+ */
+export function estimateGroundCost(input: GroundCostInput | boolean): number {
+  // Back-compat: older callers passed a bare `isHomeStay` boolean.
+  const { isHomeStay, nights, days, costTier } =
+    typeof input === "boolean" ? { isHomeStay: input, nights: undefined, days: undefined, costTier: undefined } : input;
+
+  const tripNights = nights ?? WEEKEND_NIGHTS;
+  const tripDays = days ?? WEEKEND_DAYS;
+  const multiplier = TIER_MULTIPLIER[costTier ?? 3];
+
+  const hotel = isHomeStay ? 0 : ESTIMATED_HOTEL_PER_NIGHT_USD * tripNights * multiplier;
+  const food = ESTIMATED_FOOD_PER_PERSON_PER_DAY_USD * TRAVELERS * tripDays * multiplier;
   return hotel + food;
 }

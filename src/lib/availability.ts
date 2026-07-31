@@ -1,9 +1,9 @@
-import { addDays, format, startOfDay } from "date-fns";
+import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
 import { PEOPLE } from "@/lib/people";
 import { PLANNED_TRIPS_LABEL } from "@/lib/planned-trips";
 
-type PersonId = (typeof PEOPLE)[number]["id"];
+export type PersonId = (typeof PEOPLE)[number]["id"];
 
 const HORIZON_DAYS = 200;
 
@@ -101,7 +101,9 @@ export function getTogetherIntervals(snapshot: AvailabilitySnapshot): DateInterv
     const [year, month, day] = iso.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     const last = intervals[intervals.length - 1];
-    if (last && (date.getTime() - last.end.getTime()) / 86400000 <= 1) {
+    // Compare calendar days, not elapsed ms -- a DST fall-back boundary makes
+    // consecutive days 25h apart, which would wrongly split a contiguous trip.
+    if (last && differenceInCalendarDays(date, last.end) <= 1) {
       last.end = date;
     } else {
       intervals.push({ start: date, end: date });
@@ -120,14 +122,14 @@ export function getBusyTitles(
   return snapshot.busyEvents[personId][format(date, "yyyy-MM-dd")] ?? [];
 }
 
-type PersonDayStatus = "free" | "busy" | "unknown";
+export type PersonDayStatus = "free" | "busy" | "unknown";
 
 /**
  * A specific known-busy day (real sync or a manually-added planned trip)
  * always reports "busy", even for someone without a connected calendar --
  * everything else is "unknown" until they connect one.
  */
-function personDayStatus(
+export function personDayStatus(
   snapshot: AvailabilitySnapshot,
   personId: PersonId,
   date: Date,
@@ -155,6 +157,79 @@ function getNextOrCurrentSaturday(date: Date): Date {
   return addDays(date, diff);
 }
 
+export type RangeAvailability = {
+  start: Date;
+  end: Date;
+  /** Calendar days inclusive of both ends. */
+  days: number;
+  nights: number;
+  /** Nobody is KNOWN busy. Unknown days are allowed -- this is the real filter. */
+  noOneBusy: boolean;
+  /** Nobody busy AND nobody unknown. Requires everyone to have a synced calendar. */
+  bothFree: boolean;
+  /**
+   * "confirmed" only when every day is positively known free for everyone.
+   * While someone hasn't connected a calendar this stays "unconfirmed" --
+   * a trip is still worth proposing, we just can't promise they're free.
+   */
+  confidence: "confirmed" | "unconfirmed";
+  busyNames: string[];
+  busyDetails: { name: string; titles: string[] }[];
+  unknownNames: string[];
+};
+
+function eachDay(start: Date, end: Date): Date[] {
+  const days: Date[] = [];
+  let cursor = startOfDay(start);
+  const last = startOfDay(end);
+  while (cursor <= last) {
+    days.push(cursor);
+    cursor = addDays(cursor, 1);
+  }
+  return days;
+}
+
+/**
+ * Availability across an arbitrary date range, inclusive of both ends.
+ * The weekend helpers below are a special case of this.
+ */
+export function getRangeAvailability(
+  snapshot: AvailabilitySnapshot,
+  start: Date,
+  end: Date,
+): RangeAvailability {
+  const tripDays = eachDay(start, end);
+
+  const busyPeople = PEOPLE.filter((p) =>
+    tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "busy"),
+  );
+  const unknownPeople = PEOPLE.filter(
+    (p) =>
+      !busyPeople.includes(p) &&
+      tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "unknown"),
+  );
+  const busyDetails = busyPeople.map((p) => ({
+    name: p.name,
+    titles: Array.from(new Set(tripDays.flatMap((d) => getBusyTitles(snapshot, p.id, d)))),
+  }));
+
+  const noOneBusy = busyPeople.length === 0;
+  const bothFree = noOneBusy && unknownPeople.length === 0;
+
+  return {
+    start: startOfDay(start),
+    end: startOfDay(end),
+    days: tripDays.length,
+    nights: Math.max(tripDays.length - 1, 0),
+    noOneBusy,
+    bothFree,
+    confidence: bothFree ? "confirmed" : "unconfirmed",
+    busyNames: busyPeople.map((p) => p.name),
+    busyDetails,
+    unknownNames: unknownPeople.map((p) => p.name),
+  };
+}
+
 export type WeekendAvailability = {
   friday: Date;
   saturday: Date;
@@ -171,28 +246,16 @@ export type WeekendAvailability = {
 function weekendFor(snapshot: AvailabilitySnapshot, saturday: Date): WeekendAvailability {
   const friday = addDays(saturday, -1);
   const sunday = addDays(saturday, 1);
-  const tripDays = [friday, saturday, sunday];
-
-  const busyPeople = PEOPLE.filter((p) =>
-    tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "busy"),
-  );
-  const unknownPeople = PEOPLE.filter(
-    (p) =>
-      !busyPeople.includes(p) && tripDays.some((d) => personDayStatus(snapshot, p.id, d) === "unknown"),
-  );
-  const busyDetails = busyPeople.map((p) => ({
-    name: p.name,
-    titles: Array.from(new Set(tripDays.flatMap((d) => getBusyTitles(snapshot, p.id, d)))),
-  }));
+  const range = getRangeAvailability(snapshot, friday, sunday);
 
   return {
     friday,
     saturday,
     sunday,
-    bothFree: unknownPeople.length === 0 && busyPeople.length === 0,
-    busyNames: busyPeople.map((p) => p.name),
-    busyDetails,
-    unknownNames: unknownPeople.map((p) => p.name),
+    bothFree: range.bothFree,
+    busyNames: range.busyNames,
+    busyDetails: range.busyDetails,
+    unknownNames: range.unknownNames,
   };
 }
 

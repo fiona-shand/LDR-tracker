@@ -30,10 +30,12 @@ export default async function CalendarPage({
   const isThisMonth = format(currentMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
 
   const weekends = getUpcomingWeekends(snapshot, 8);
-  const lastSeenInfo = getLastSeenInfo(snapshot);
   const ptoBalance = await getFionaPtoBalance();
   const ptoSuggestions = upcomingPtoSuggestions(snapshot);
   const plannedTrips = await listPlannedTrips();
+  // Trip rows reach back before today; the snapshot doesn't, so past visits
+  // are only visible when these are passed in.
+  const lastSeenInfo = getLastSeenInfo(snapshot, plannedTrips);
 
   return (
     <div className="flex flex-col gap-10">

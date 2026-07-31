@@ -1,9 +1,14 @@
-import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { addDays, differenceInCalendarDays, startOfDay } from "date-fns";
 import type { AvailabilitySnapshot } from "@/lib/availability";
+import { CADENCE_MAX_WEEKS, CADENCE_MIN_WEEKS } from "@/lib/cadence";
 import { PEOPLE } from "@/lib/people";
+import type { PlannedTripRow } from "@/lib/planned-trips";
 
-/** How often you two want to see each other, in weeks. */
-export const TARGET_VISIT_INTERVAL_WEEKS = 5;
+/**
+ * How often you two want to see each other, in weeks.
+ * @deprecated Prefer CADENCE_MIN_WEEKS / CADENCE_MAX_WEEKS from `cadence.ts`.
+ */
+export const TARGET_VISIT_INTERVAL_WEEKS = CADENCE_MIN_WEEKS;
 
 type Person = (typeof PEOPLE)[number];
 
@@ -61,9 +66,33 @@ export type LastSeenInfo = {
   isOverdue: boolean;
 };
 
-export function getLastSeenInfo(snapshot: AvailabilitySnapshot): LastSeenInfo {
+/**
+ * Every day covered by a recorded trip, expanded from its start/end.
+ * The availability snapshot only reaches back to today, so a trip that has
+ * already finished is invisible to it -- these rows are the only way to know
+ * when you last actually saw each other.
+ */
+function datesFromTripRows(trips: PlannedTripRow[]): Date[] {
+  const dates: Date[] = [];
+  for (const trip of trips) {
+    let cursor = startOfDay(trip.startsAt);
+    const end = startOfDay(trip.endsAt);
+    while (cursor <= end) {
+      dates.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+  }
+  return dates;
+}
+
+export function getLastSeenInfo(
+  snapshot: AvailabilitySnapshot,
+  plannedTrips: PlannedTripRow[] = [],
+): LastSeenInfo {
   const today = startOfDay(new Date());
-  const dates = detectVisitDates(snapshot);
+  const dates = [...detectVisitDates(snapshot), ...datesFromTripRows(plannedTrips)].sort(
+    (a, b) => a.getTime() - b.getTime(),
+  );
 
   const past = dates.filter((d) => d <= today);
   const future = dates.filter((d) => d > today);
@@ -78,7 +107,7 @@ export function getLastSeenInfo(snapshot: AvailabilitySnapshot): LastSeenInfo {
     lastSeenDate,
     weeksSinceLastSeen,
     nextPlannedDate,
-    targetWeeks: TARGET_VISIT_INTERVAL_WEEKS,
-    isOverdue: weeksSinceLastSeen != null && weeksSinceLastSeen > TARGET_VISIT_INTERVAL_WEEKS,
+    targetWeeks: CADENCE_MIN_WEEKS,
+    isOverdue: weeksSinceLastSeen != null && weeksSinceLastSeen > CADENCE_MAX_WEEKS,
   };
 }
